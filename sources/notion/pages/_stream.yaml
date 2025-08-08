@@ -1,0 +1,70 @@
+# Notion Pages Stream Configuration
+# Pages and databases from Notion workspace
+
+name: notion_pages
+source: notion
+display_name: Notion Pages
+description: Pages and databases from Notion workspace
+
+# Stream processing settings
+ingestion:
+  type: pull  # We fetch from Notion API
+  batch_type: pages
+  raw_data_type: NotionPage
+  
+# Output type - semantics instead of signals
+output: semantics
+
+# Semantic types produced by this stream
+semantics:
+  - page      # Regular Notion pages
+  - database  # Notion databases
+
+# API configuration
+api:
+  endpoint: https://api.notion.com/v1
+  rate_limit: 3  # requests per second
+  pagination: true
+  page_size: 100  # Max results per request
+  
+# Sync configuration
+sync:
+  schedule: "*/30 * * * *"  # Every 30 minutes
+  modes:
+    initial:
+      description: "Fetch all accessible pages in workspace"
+      fetch_all: true
+      filter: none
+      use_cursor: false
+    incremental:
+      description: "Fetch only changed pages since last sync"
+      use_cursor: true
+      filter: last_edited_time
+      lookback_minutes: 35  # Slight overlap with 30-min schedule
+    full_refresh:
+      description: "Re-fetch all pages and compare for changes"
+      fetch_all: true
+      compare_hash: true
+      use_cursor: false
+      
+# Processing configuration
+processing:
+  extract_text: true      # Extract text from blocks
+  extract_metadata: true  # Extract properties and metadata
+  versioning: true       # Track document versions
+  deduplication:
+    key: ["page_id", "last_edited_time"]
+    strategy: content_hash
+  normalization: true
+  validation:
+    required_fields:
+      - id
+      - object  # 'page' or 'database'
+      - created_time
+      - last_edited_time
+      
+# Storage settings
+storage:
+  retention: unlimited  # Keep all versions
+  compression: gzip
+  format: json

@@ -1,0 +1,1 @@
+ALTER TABLE "stream_configs" ADD COLUMN "last_ingestion_at" timestamp with time zone;

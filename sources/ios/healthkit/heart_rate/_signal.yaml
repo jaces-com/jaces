@@ -1,0 +1,48 @@
+# Heart Rate Signal Configuration
+# Cardiovascular activity tracking
+
+name: ios_heart_rate
+source: ios
+stream: healthkit
+display_name: Heart Rate
+description: Heart rate in beats per minute
+
+# Units and measurement
+unit:
+  ucum: /min  # beats per minute
+  display: bpm
+  range: [30, 250]
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt
+  cost_function: l2
+  value_type: continuous
+  min_segment_size: 10
+  penalty_multiplier: 1.5
+  gap_threshold_seconds: 600  # 10 minutes
+
+# Processing schedule
+schedule:
+  cron: "*/5 * * * *"
+  priority: high
+
+# Signal importance
+weight:
+  macro: 0.85
+  micro: 0.8
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 120
+  min_change: 10  # bpm change
+  confidence_threshold: 0.85
+  
+# Metadata
+metadata:
+  source_priority:  # Prefer certain sources
+    - apple_watch
+    - fitness_tracker
+    - manual_entry
+  outlier_removal: true
+  interpolation: linear

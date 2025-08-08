@@ -1,0 +1,22 @@
+// Configuration settings file format documentation can be found at:
+// https://help.apple.com/xcode/#/dev745c5c974
+
+// Development Team
+// Set this to your Apple Developer Team ID
+// You can find this in Xcode under Signing & Capabilities
+// or in the Apple Developer portal
+DEVELOPMENT_TEAM = 
+
+// Code Signing
+// Leave empty for automatic signing
+CODE_SIGN_IDENTITY = 
+CODE_SIGN_STYLE = Automatic
+
+// Bundle Identifier
+PRODUCT_BUNDLE_IDENTIFIER = com.jaces.ios
+
+// API Configuration
+// These are compile-time constants for default values
+// Users can override these in the app settings
+DEFAULT_API_ENDPOINT = http:/$()/localhost:3000
+DEFAULT_DEVICE_TOKEN_PREFIX = dev_tk_

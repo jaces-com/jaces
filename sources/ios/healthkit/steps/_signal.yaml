@@ -1,0 +1,56 @@
+# Steps Signal Configuration
+# Physical activity through step counting
+
+name: ios_steps
+source: ios
+stream: healthkit
+display_name: Step Count
+description: Number of steps taken
+
+# Units and measurement
+unit:
+  ucum: 1  # count (dimensionless)
+  display: steps
+  range: [0, 100000]  # Daily maximum
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt
+  cost_function: l1
+  value_type: discrete
+  min_segment_size: 5
+  penalty_multiplier: 1.0
+  gap_threshold_seconds: 1800  # 30 minutes
+  aggregation: sum  # Sum steps in windows
+
+# Processing schedule
+schedule:
+  cron: "*/10 * * * *"  # Every 10 minutes
+  priority: medium
+
+# Signal importance
+weight:
+  macro: 0.75
+  micro: 0.7
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 300  # 5 minutes
+  min_change: 100  # steps
+  confidence_threshold: 0.8
+  
+# Activity levels
+activity_levels:
+  sedentary: [0, 2000]
+  light: [2000, 5000]
+  moderate: [5000, 10000]
+  active: [10000, 15000]
+  very_active: [15000, 100000]
+  
+# Metadata
+metadata:
+  daily_goal: 10000
+  aggregation_windows:
+    - hourly
+    - daily
+    - weekly

@@ -1,0 +1,55 @@
+# Google Calendar Stream Configuration  
+# Calendar events and appointments from Google Calendar API
+
+name: google_calendar
+source: google
+display_name: Google Calendar
+description: Calendar events and appointments
+
+# Stream processing settings
+ingestion:
+  type: pull  # We fetch from Google API
+  batch_type: events
+  raw_data_type: CalendarEvent
+  
+# Signals produced by this stream
+signals:
+  - calendar  # Event-based categorical signal
+
+# API configuration
+api:
+  endpoint: https://www.googleapis.com/calendar/v3
+  rate_limit: 100  # requests per minute
+  pagination: true
+  max_results: 250
+  
+# Sync configuration
+sync:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  lookback_days: 90
+  lookahead_days: 360
+  calendars:
+    - primary
+    - work
+    - personal
+  exclude_patterns:
+    - "Busy"
+    - "Out of Office"
+    
+# Processing configuration
+processing:
+  deduplication: 
+    strategy: content_hash  # Multiple events can have same timestamp
+  normalization: true
+  validation:
+    required_fields:
+      - id
+      - summary
+      - start
+      - end
+      
+# Storage settings
+storage:
+  retention_days: 400  # Keep past events + future
+  compression: gzip
+  format: json

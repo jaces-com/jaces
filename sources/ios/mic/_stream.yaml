@@ -1,0 +1,48 @@
+# iOS Microphone Stream Configuration
+# Audio capture and analysis from iOS devices
+
+name: ios_mic
+source: ios
+display_name: iOS Microphone Audio
+description: Audio chunks for transcription and analysis
+
+# Stream processing settings
+ingestion:
+  type: push
+  batch_type: chunks
+  raw_data_type: AudioChunk
+  chunk_duration_ms: 5000  # 5 second chunks
+  
+# Signals produced by this stream
+signals:
+  - audio_level
+  - mic_transcription  # Not implemented yet
+
+# Processing configuration
+processing:
+  deduplication: false  # Audio chunks should not be deduplicated
+  normalization: true
+  validation:
+    required_fields:
+      - audio_data
+      - timestamp
+      - sample_rate
+    audio:
+      sample_rate: 16000
+      encoding: pcm16
+      channels: 1
+      
+# Storage settings
+storage:
+  retention_days: 7  # Audio data is large, keep briefly
+  compression: opus  # Better audio compression
+  format: binary
+  
+# Privacy settings
+privacy:
+  encryption: true
+  anonymization: true
+  auto_delete: true
+  compliance:
+    - GDPR
+    - CCPA

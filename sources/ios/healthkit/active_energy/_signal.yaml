@@ -1,0 +1,34 @@
+# Active Energy Signal Configuration
+
+name: ios_active_energy
+source: ios
+stream: healthkit
+display_name: Active Energy
+description: Calories burned through activity
+
+unit:
+  ucum: kcal
+  display: kcal
+  range: [0, 10000]
+
+computation:
+  algorithm: pelt
+  cost_function: l1
+  value_type: continuous
+  min_segment_size: 5
+  penalty_multiplier: 1.2
+  gap_threshold_seconds: 1800
+  aggregation: sum
+
+schedule:
+  cron: "*/10 * * * *"
+  priority: medium
+
+weight:
+  macro: 0.7
+  micro: 0.65
+
+transitions:
+  min_gap_seconds: 300
+  min_change: 50  # kcal
+  confidence_threshold: 0.75

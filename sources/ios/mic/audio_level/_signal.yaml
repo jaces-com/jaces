@@ -1,0 +1,39 @@
+# Audio Level Signal Configuration
+
+name: ios_audio_level
+source: ios
+stream: mic
+display_name: Audio Level
+description: Ambient sound level detection
+
+unit:
+  ucum: dB  # decibels
+  display: dB
+  range: [0, 140]
+
+computation:
+  algorithm: pelt
+  cost_function: l1
+  value_type: continuous
+  min_segment_size: 10
+  penalty_multiplier: 1.5
+  gap_threshold_seconds: 600
+
+schedule:
+  cron: "*/5 * * * *"
+  priority: low
+
+weight:
+  macro: 0.5
+  micro: 0.4
+
+transitions:
+  min_gap_seconds: 60
+  min_change: 10  # dB
+  confidence_threshold: 0.7
+
+categories:
+  quiet: [0, 40]
+  moderate: [40, 70]
+  loud: [70, 90]
+  very_loud: [90, 140]

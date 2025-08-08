@@ -1,0 +1,33 @@
+# Heart Rate Variability Signal Configuration
+
+name: ios_heart_rate_variability
+source: ios
+stream: healthkit
+display_name: Heart Rate Variability
+description: HRV measurement in milliseconds
+
+unit:
+  ucum: ms
+  display: ms
+  range: [0, 500]
+
+computation:
+  algorithm: pelt
+  cost_function: l2
+  value_type: continuous
+  min_segment_size: 10
+  penalty_multiplier: 2.0
+  gap_threshold_seconds: 3600  # 1 hour
+
+schedule:
+  cron: "*/15 * * * *"
+  priority: low
+
+weight:
+  macro: 0.6
+  micro: 0.5
+
+transitions:
+  min_gap_seconds: 600
+  min_change: 10  # ms
+  confidence_threshold: 0.9

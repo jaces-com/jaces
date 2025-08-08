@@ -1,0 +1,48 @@
+# Mac Application Activity Stream Configuration
+# Application usage and focus tracking from macOS
+
+name: mac_apps
+source: mac
+display_name: Mac Applications
+description: Application focus and usage events
+
+# Stream processing settings
+ingestion:
+  type: push
+  batch_type: events
+  raw_data_type: AppEvent
+  
+# Signals produced by this stream
+signals:
+  - apps  # Categorical signal of app usage
+
+# Processing configuration
+processing:
+  deduplication:
+    strategy: timestamp  # App events should be unique by timestamp
+  normalization: true
+  validation:
+    required_fields:
+      - app_name
+      - bundle_id
+      - timestamp
+      - event_type
+    event_types:
+      - focus_gained
+      - focus_lost
+      - launch
+      - quit
+      
+# Storage settings
+storage:
+  retention_days: 30
+  compression: gzip
+  format: json
+  
+# Privacy settings
+privacy:
+  filter_sensitive_apps:
+    - com.apple.keychainaccess
+    - com.1password
+    - com.lastpass
+  anonymize_window_titles: true
