@@ -1,0 +1,83 @@
+# Mac App Activity Signal Configuration
+# Application focus and usage tracking
+
+name: mac_app_activity
+source: mac
+stream: mac_apps
+display_name: App Activity
+description: Application focus duration and switching patterns
+
+# Units and measurement
+unit:
+  ucum: min  # minutes of focus
+  display: minutes
+  range: [0, 1440]  # 0 to 24 hours
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt
+  cost_function: l2
+  value_type: continuous
+  min_segment_size: 10
+  penalty_multiplier: 1.5
+  gap_threshold_seconds: 300  # 5 minutes
+
+# Processing schedule
+schedule:
+  cron: "*/15 * * * *"  # Every 15 minutes
+  priority: high
+
+# Signal importance
+weight:
+  macro: 0.75
+  micro: 0.7
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 60  # 1 minute
+  min_change: 5  # Minimum 5 minutes change in focus
+  confidence_threshold: 0.8
+  
+# App categories for productivity scoring
+app_categories:
+  productivity:
+    - "Visual Studio Code"
+    - "Xcode"
+    - "Terminal"
+    - "iTerm"
+    - "Sublime Text"
+    - "IntelliJ IDEA"
+    - "PyCharm"
+  communication:
+    - "Slack"
+    - "Discord"
+    - "Messages"
+    - "Mail"
+    - "Microsoft Teams"
+    - "Zoom"
+  browser:
+    - "Safari"
+    - "Google Chrome"
+    - "Firefox"
+    - "Arc"
+    - "Brave"
+  creative:
+    - "Figma"
+    - "Sketch"
+    - "Adobe Photoshop"
+    - "Adobe Illustrator"
+    - "Final Cut Pro"
+  entertainment:
+    - "Music"
+    - "TV"
+    - "Netflix"
+    - "YouTube"
+    - "Spotify"
+    
+# Metadata
+metadata:
+  track_idle_time: true
+  idle_threshold_seconds: 300  # 5 minutes
+  aggregation_window: 900  # 15 minute windows
+  exclude_background_apps: true
+  min_focus_duration: 30  # Minimum 30 seconds to count as focused

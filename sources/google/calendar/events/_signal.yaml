@@ -1,0 +1,52 @@
+# Google Calendar Events Signal Configuration
+# Calendar event activity tracking
+
+name: google_calendar_events
+source: google
+stream: google_calendar
+display_name: Calendar Events
+description: Calendar event density and meeting patterns
+
+# Units and measurement
+unit:
+  ucum: /h  # events per hour
+  display: events/hr
+  range: [0, 10]
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt
+  cost_function: l1
+  value_type: categorical  # Events are discrete occurrences
+  min_segment_size: 5
+  penalty_multiplier: 1.2
+  gap_threshold_seconds: 3600  # 1 hour
+
+# Processing schedule
+schedule:
+  cron: "0 */2 * * *"  # Every 2 hours
+  priority: medium
+
+# Signal importance
+weight:
+  macro: 0.7
+  micro: 0.65
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 1800  # 30 minutes
+  min_change: 2  # Minimum change in events/hour
+  confidence_threshold: 0.75
+  
+# Event categories
+categories:
+  work: ["meeting", "standup", "1:1", "review", "sync"]
+  personal: ["appointment", "lunch", "break", "personal"]
+  focus: ["focus time", "deep work", "coding", "writing"]
+  
+# Metadata
+metadata:
+  aggregation_window: 3600  # 1 hour windows
+  include_all_day_events: false
+  include_declined: false
+  outlier_removal: false

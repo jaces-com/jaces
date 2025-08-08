@@ -1,0 +1,917 @@
+version: 2.0.0
+generated_at: '2025-08-08T16:57:49.946119'
+sources:
+  google:
+    path: google/
+    display_name: Google
+    description: Google services including Calendar, Gmail, and Drive
+    company: google
+    platform: cloud
+    icon: ri:google-fill
+    auth:
+      type: oauth2
+      provider: google
+      auth_url: https://accounts.google.com/o/oauth2/v2/auth
+      token_url: https://oauth2.googleapis.com/token
+      revoke_url: https://oauth2.googleapis.com/revoke
+    oauth:
+      auth_proxy: https://auth.jaces.com/google/auth
+      token_refresh_window: 300
+    sync:
+      type: pull
+      default_lookback_days: 90
+      default_lookahead_days: 360
+      page_size: 100
+    requirements: {}
+    streams:
+    - google_calendar
+    streams_config:
+    - name: calendar
+      display_name: Google Calendar
+      description: Calendar events and appointments
+      required_scopes:
+      - https://www.googleapis.com/auth/calendar.readonly
+      - https://www.googleapis.com/auth/calendar.events.readonly
+  ios:
+    path: ios/
+    display_name: iPhone
+    description: All data from your iPhone including location, sound, and voice
+    company: apple
+    platform: device
+    icon: ri:smartphone-line
+    auth:
+      type: device_token
+      required_fields:
+      - device_id
+      - device_name
+      - os_version
+      pairing:
+        code_length: 6
+        timeout_seconds: 300
+    oauth: {}
+    sync:
+      batch_upload_interval: 300
+      max_batch_size: 1000
+      compression: gzip
+      retry_policy:
+        max_retries: 3
+        backoff_multiplier: 2
+    requirements:
+      min_os_version: '14.0'
+      capabilities:
+      - location_services
+      - healthkit
+      - microphone
+      permissions:
+      - location_always
+      - health_read
+      - microphone
+    streams:
+    - ios_healthkit
+    - ios_location
+    - ios_mic
+    streams_config:
+    - name: location
+      display_name: Core Location
+      description: GPS, altitude, and speed data
+    - name: healthkit
+      display_name: HealthKit
+      description: Health metrics including heart rate, steps, sleep
+    - name: mic
+      display_name: Microphone
+      description: Audio capture and transcription
+  notion:
+    path: notion/
+    display_name: Notion
+    description: Notion workspace pages, databases, and blocks
+    company: notion
+    platform: cloud
+    icon: ri:notion-fill
+    auth:
+      type: oauth2
+      provider: notion
+      auth_url: https://api.notion.com/v1/oauth/authorize
+      token_url: https://api.notion.com/v1/oauth/token
+    oauth:
+      auth_proxy: https://auth.jaces.com/notion/auth
+      public_integration: true
+      token_refresh_window: 0
+    sync:
+      type: pull
+      default_lookback_days: 90
+      supports_incremental: true
+      supports_cursor: true
+    requirements: {}
+    streams:
+    - notion_pages
+    streams_config:
+    - name: pages
+      display_name: Notion Pages
+      description: Pages and databases from Notion workspace
+      required_permissions:
+      - read_content
+      - read_user
+  mac:
+    path: mac/
+    display_name: Mac
+    description: Application usage and activity from your Mac
+    company: apple
+    platform: device
+    icon: ri:mac-line
+    auth:
+      type: device_token
+      required_fields:
+      - device_id
+      - device_name
+      - os_version
+      - hardware_model
+    oauth: {}
+    sync:
+      batch_upload_interval: 300
+      max_batch_size: 500
+      compression: gzip
+      local_buffer:
+        max_size_mb: 100
+        retention_days: 7
+      retry_policy:
+        max_retries: 5
+        backoff_multiplier: 2
+    requirements:
+      min_os_version: '11.0'
+      capabilities:
+      - accessibility_api
+      - screen_recording
+      permissions:
+      - accessibility
+      - automation
+    streams:
+    - mac_apps
+    streams_config:
+    - name: apps
+      display_name: Application Activity
+      description: Track which applications are in focus and for how long
+streams:
+  google_calendar:
+    source: google
+    path: google/calendar/
+    display_name: Google Calendar
+    description: Calendar events and appointments
+    processor: sources.google.calendar.stream_processor
+    output_type: signals
+    ingestion:
+      type: pull
+      batch_type: events
+      raw_data_type: CalendarEvent
+    sync:
+      schedule: '*/15 * * * *'
+      lookback_days: 90
+      lookahead_days: 360
+      calendars:
+      - primary
+      - work
+      - personal
+      exclude_patterns:
+      - Busy
+      - Out of Office
+    processing:
+      deduplication:
+        strategy: content_hash
+      normalization: true
+      validation:
+        required_fields:
+        - id
+        - summary
+        - start
+        - end
+    storage:
+      retention_days: 400
+      compression: gzip
+      format: json
+    signals:
+    - google_calendar_events
+    semantics: []
+    sync_module: sources.google.calendar.sync
+    sync_class: GoogleCalendarSync
+  ios_healthkit:
+    source: ios
+    path: ios/healthkit/
+    display_name: iOS HealthKit
+    description: Health data including heart rate, steps, workouts, sleep, and energy
+    processor: sources.ios.healthkit.stream_processor
+    output_type: signals
+    ingestion:
+      type: push
+      batch_type: array
+      raw_data_type: HKSample
+    sync: {}
+    processing:
+      deduplication:
+        strategy: content_hash
+      normalization: true
+      validation:
+        required_fields:
+        - type
+        - value
+        - timestamp
+        ranges:
+          heart_rate:
+          - 30
+          - 250
+          steps:
+          - 0
+          - 100000
+          active_energy:
+          - 0
+          - 10000
+          heart_rate_variability:
+          - 0
+          - 500
+    storage:
+      retention_days: 365
+      compression: gzip
+      format: json
+    signals:
+    - ios_active_energy
+    - ios_sleep
+    - ios_workouts
+    - ios_heart_rate_variability
+    - ios_heart_rate
+    - ios_steps
+    semantics: []
+  ios_location:
+    source: ios
+    path: ios/location/
+    display_name: iOS Core Location
+    description: Raw CoreLocation data including GPS, altitude, speed, and activity
+    processor: sources.ios.location.stream_processor
+    output_type: signals
+    ingestion:
+      type: push
+      batch_type: array
+      raw_data_type: CLLocation
+    sync: {}
+    processing:
+      deduplication:
+        strategy: timestamp
+      normalization: true
+      validation:
+        required_fields:
+        - latitude
+        - longitude
+        - timestamp
+        ranges:
+          latitude:
+          - -90
+          - 90
+          longitude:
+          - -180
+          - 180
+          altitude:
+          - -500
+          - 9000
+          speed:
+          - 0
+          - 500
+    storage:
+      retention_days: 90
+      compression: gzip
+      format: json
+    signals:
+    - ios_coordinates
+    - ios_speed
+    - ios_altitude
+    semantics: []
+  ios_mic:
+    source: ios
+    path: ios/mic/
+    display_name: iOS Microphone Audio
+    description: Audio chunks for transcription and analysis
+    processor: sources.ios.mic.stream_processor
+    output_type: signals
+    ingestion:
+      type: push
+      batch_type: chunks
+      raw_data_type: AudioChunk
+      chunk_duration_ms: 5000
+    sync: {}
+    processing:
+      deduplication: false
+      normalization: true
+      validation:
+        required_fields:
+        - audio_data
+        - timestamp
+        - sample_rate
+        audio:
+          sample_rate: 16000
+          encoding: pcm16
+          channels: 1
+    storage:
+      retention_days: 7
+      compression: opus
+      format: binary
+    signals:
+    - ios_audio_level
+    semantics: []
+    sync_module: sources.ios.mic.sync
+    sync_class: IosMicSync
+  notion_pages:
+    source: notion
+    path: notion/pages/
+    display_name: Notion Pages
+    description: Pages and databases from Notion workspace
+    processor: sources.notion.pages.stream_processor
+    output_type: semantics
+    ingestion:
+      type: pull
+      batch_type: pages
+      raw_data_type: NotionPage
+    sync: &id001
+      schedule: '*/30 * * * *'
+      modes:
+        initial:
+          description: Fetch all accessible pages in workspace
+          fetch_all: true
+          filter: none
+          use_cursor: false
+        incremental:
+          description: Fetch only changed pages since last sync
+          use_cursor: true
+          filter: last_edited_time
+          lookback_minutes: 35
+        full_refresh:
+          description: Re-fetch all pages and compare for changes
+          fetch_all: true
+          compare_hash: true
+          use_cursor: false
+    processing: &id002
+      extract_text: true
+      extract_metadata: true
+      versioning: true
+      deduplication:
+        key:
+        - page_id
+        - last_edited_time
+        strategy: content_hash
+      normalization: true
+      validation:
+        required_fields:
+        - id
+        - object
+        - created_time
+        - last_edited_time
+    storage: &id003
+      retention: unlimited
+      compression: gzip
+      format: json
+    signals: []
+    semantics:
+    - page
+    - database
+    sync_module: sources.notion.pages.sync
+    sync_class: NotionPagesSync
+  mac_apps:
+    source: mac
+    path: mac/apps/
+    display_name: Mac Applications
+    description: Application focus and usage events
+    processor: sources.mac.apps.stream_processor
+    output_type: signals
+    ingestion:
+      type: push
+      batch_type: events
+      raw_data_type: AppEvent
+    sync: {}
+    processing:
+      deduplication:
+        strategy: timestamp
+      normalization: true
+      validation:
+        required_fields:
+        - app_name
+        - bundle_id
+        - timestamp
+        - event_type
+        event_types:
+        - focus_gained
+        - focus_lost
+        - launch
+        - quit
+    storage:
+      retention_days: 30
+      compression: gzip
+      format: json
+    signals:
+    - mac_app_activity
+    semantics: []
+    sync_module: sources.mac.apps.sync
+    sync_class: MacAppsSync
+signals:
+  google_calendar_events:
+    source: google
+    stream: google_calendar
+    path: google/calendar/events/
+    display_name: Calendar Events
+    description: Calendar event density and meeting patterns
+    unit:
+      ucum: /h
+      display: events/hr
+      range:
+      - 0
+      - 10
+    value_type: categorical
+    algorithm: pelt
+    cost_function: l1
+    computation:
+      algorithm: pelt
+      cost_function: l1
+      value_type: categorical
+      min_segment_size: 5
+      penalty_multiplier: 1.2
+      gap_threshold_seconds: 3600
+    weight:
+      macro: 0.7
+      micro: 0.65
+    transitions:
+      min_gap_seconds: 1800
+      min_change: 2
+      confidence_threshold: 0.75
+    zones: {}
+    metadata:
+      aggregation_window: 3600
+      include_all_day_events: false
+      include_declined: false
+      outlier_removal: false
+    schedule:
+      cron: 0 */2 * * *
+      priority: medium
+    detector: sources.google.calendar.events
+  ios_active_energy:
+    source: ios
+    stream: ios_healthkit
+    path: ios/healthkit/active_energy/
+    display_name: Active Energy
+    description: Calories burned through activity
+    unit:
+      ucum: kcal
+      display: kcal
+      range:
+      - 0
+      - 10000
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l1
+    computation:
+      algorithm: pelt
+      cost_function: l1
+      value_type: continuous
+      min_segment_size: 5
+      penalty_multiplier: 1.2
+      gap_threshold_seconds: 1800
+      aggregation: sum
+    weight:
+      macro: 0.7
+      micro: 0.65
+    transitions:
+      min_gap_seconds: 300
+      min_change: 50
+      confidence_threshold: 0.75
+    zones: {}
+    metadata: {}
+    schedule:
+      cron: '*/10 * * * *'
+      priority: medium
+    detector: sources.ios.healthkit.active_energy
+  ios_sleep:
+    source: ios
+    stream: ios_healthkit
+    path: ios/healthkit/sleep/
+    display_name: Sleep Analysis
+    description: Sleep stages and quality tracking
+    unit:
+      ucum: h
+      display: hours
+    value_type: categorical
+    algorithm: categorical
+    cost_function: l2
+    computation:
+      algorithm: categorical
+      value_type: categorical
+      categories:
+      - awake
+      - light
+      - deep
+      - rem
+      min_segment_size: 30
+      gap_threshold_seconds: 7200
+    weight:
+      macro: 0.9
+      micro: 0.85
+    transitions:
+      min_gap_seconds: 1800
+      confidence_threshold: 0.85
+    zones: {}
+    metadata: {}
+    schedule:
+      cron: 0 */1 * * *
+      priority: low
+    detector: sources.ios.healthkit.sleep
+  ios_workouts:
+    source: ios
+    stream: ios_healthkit
+    path: ios/healthkit/workouts/
+    display_name: Workout Sessions
+    description: Exercise and workout tracking
+    unit:
+      ucum: min
+      display: minutes
+    value_type: categorical
+    algorithm: event_detection
+    cost_function: l2
+    computation:
+      algorithm: event_detection
+      value_type: categorical
+      categories:
+      - running
+      - walking
+      - cycling
+      - swimming
+      - strength
+      - yoga
+      - other
+    weight:
+      macro: 0.85
+      micro: 0.8
+    transitions:
+      min_gap_seconds: 300
+      confidence_threshold: 0.9
+    zones: {}
+    metadata: {}
+    schedule:
+      cron: '*/10 * * * *'
+      priority: medium
+    detector: sources.ios.healthkit.workouts
+  ios_heart_rate_variability:
+    source: ios
+    stream: ios_healthkit
+    path: ios/healthkit/heart_rate_variability/
+    display_name: Heart Rate Variability
+    description: HRV measurement in milliseconds
+    unit:
+      ucum: ms
+      display: ms
+      range:
+      - 0
+      - 500
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l2
+    computation:
+      algorithm: pelt
+      cost_function: l2
+      value_type: continuous
+      min_segment_size: 10
+      penalty_multiplier: 2.0
+      gap_threshold_seconds: 3600
+    weight:
+      macro: 0.6
+      micro: 0.5
+    transitions:
+      min_gap_seconds: 600
+      min_change: 10
+      confidence_threshold: 0.9
+    zones: {}
+    metadata: {}
+    schedule:
+      cron: '*/15 * * * *'
+      priority: low
+    detector: sources.ios.healthkit.heart_rate_variability
+  ios_heart_rate:
+    source: ios
+    stream: ios_healthkit
+    path: ios/healthkit/heart_rate/
+    display_name: Heart Rate
+    description: Heart rate in beats per minute
+    unit:
+      ucum: /min
+      display: bpm
+      range:
+      - 30
+      - 250
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l2
+    computation:
+      algorithm: pelt
+      cost_function: l2
+      value_type: continuous
+      min_segment_size: 10
+      penalty_multiplier: 1.5
+      gap_threshold_seconds: 600
+    weight:
+      macro: 0.85
+      micro: 0.8
+    transitions:
+      min_gap_seconds: 120
+      min_change: 10
+      confidence_threshold: 0.85
+    zones: {}
+    metadata:
+      source_priority:
+      - apple_watch
+      - fitness_tracker
+      - manual_entry
+      outlier_removal: true
+      interpolation: linear
+    schedule:
+      cron: '*/5 * * * *'
+      priority: high
+    detector: sources.ios.healthkit.heart_rate
+  ios_steps:
+    source: ios
+    stream: ios_healthkit
+    path: ios/healthkit/steps/
+    display_name: Step Count
+    description: Number of steps taken
+    unit:
+      ucum: 1
+      display: steps
+      range:
+      - 0
+      - 100000
+    value_type: discrete
+    algorithm: pelt
+    cost_function: l1
+    computation:
+      algorithm: pelt
+      cost_function: l1
+      value_type: discrete
+      min_segment_size: 5
+      penalty_multiplier: 1.0
+      gap_threshold_seconds: 1800
+      aggregation: sum
+    weight:
+      macro: 0.75
+      micro: 0.7
+    transitions:
+      min_gap_seconds: 300
+      min_change: 100
+      confidence_threshold: 0.8
+    zones: {}
+    metadata:
+      daily_goal: 10000
+      aggregation_windows:
+      - hourly
+      - daily
+      - weekly
+    schedule:
+      cron: '*/10 * * * *'
+      priority: medium
+    detector: sources.ios.healthkit.steps
+  ios_coordinates:
+    source: ios
+    stream: ios_location
+    path: ios/location/coordinates/
+    display_name: GPS Coordinates
+    description: Latitude and longitude coordinates
+    unit:
+      ucum: deg
+      display: coordinates
+      format: lat,lng
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l2
+    computation:
+      algorithm: pelt
+      cost_function: l2
+      distance_metric: haversine
+      value_type: continuous
+      min_segment_size: 10
+      penalty_multiplier: 1.5
+      gap_threshold_seconds: 1200
+    weight:
+      macro: 1.0
+      micro: 0.95
+    transitions:
+      min_gap_seconds: 120
+      min_distance_meters: 100
+      confidence_threshold: 0.85
+      cluster_radius_meters: 50
+    zones: {}
+    metadata:
+      accuracy_required: 20
+      interpolation: none
+      privacy:
+        obfuscate_home: true
+        blur_radius: 100
+    schedule:
+      cron: '*/5 * * * *'
+      priority: high
+    detector: sources.ios.location.coordinates
+  ios_speed:
+    source: ios
+    stream: ios_location
+    path: ios/location/speed/
+    display_name: Movement Speed
+    description: Speed of movement in meters per second
+    unit:
+      ucum: m/s
+      display: m/s
+      range:
+      - 0
+      - 500
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l1
+    computation:
+      algorithm: pelt
+      cost_function: l1
+      value_type: continuous
+      min_segment_size: 5
+      penalty_multiplier: 1.2
+      gap_threshold_seconds: 900
+    weight:
+      macro: 0.8
+      micro: 0.7
+    transitions:
+      min_gap_seconds: 120
+      min_change: 1.0
+      confidence_threshold: 0.8
+    zones: {}
+    metadata:
+      smoothing_window: 5
+      outlier_removal: true
+      max_acceleration: 10
+    schedule:
+      cron: '*/5 * * * *'
+      priority: medium
+    detector: sources.ios.location.speed
+  ios_altitude:
+    source: ios
+    stream: ios_location
+    path: ios/location/altitude/
+    display_name: Altitude
+    description: Elevation above sea level in meters
+    unit:
+      ucum: m
+      display: meters
+      range:
+      - -500
+      - 9000
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l2
+    computation:
+      algorithm: pelt
+      cost_function: l2
+      value_type: continuous
+      min_segment_size: 5
+      penalty_multiplier: 1.0
+      gap_threshold_seconds: 900
+    weight:
+      macro: 0.6
+      micro: 0.5
+    transitions:
+      min_gap_seconds: 180
+      min_change: 10
+      confidence_threshold: 0.8
+    zones: {}
+    metadata:
+      accuracy_required: 10
+      interpolation: linear
+      smoothing: true
+    schedule:
+      cron: '*/5 * * * *'
+      priority: medium
+    detector: sources.ios.location.altitude
+  ios_audio_level:
+    source: ios
+    stream: ios_mic
+    path: ios/mic/audio_level/
+    display_name: Audio Level
+    description: Ambient sound level detection
+    unit:
+      ucum: dB
+      display: dB
+      range:
+      - 0
+      - 140
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l1
+    computation:
+      algorithm: pelt
+      cost_function: l1
+      value_type: continuous
+      min_segment_size: 10
+      penalty_multiplier: 1.5
+      gap_threshold_seconds: 600
+    weight:
+      macro: 0.5
+      micro: 0.4
+    transitions:
+      min_gap_seconds: 60
+      min_change: 10
+      confidence_threshold: 0.7
+    zones: {}
+    metadata: {}
+    schedule:
+      cron: '*/5 * * * *'
+      priority: low
+    detector: sources.ios.mic.audio_level
+  mac_app_activity:
+    source: mac
+    stream: mac_apps
+    path: mac/apps/activity/
+    display_name: App Activity
+    description: Application focus duration and switching patterns
+    unit:
+      ucum: min
+      display: minutes
+      range:
+      - 0
+      - 1440
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l2
+    computation:
+      algorithm: pelt
+      cost_function: l2
+      value_type: continuous
+      min_segment_size: 10
+      penalty_multiplier: 1.5
+      gap_threshold_seconds: 300
+    weight:
+      macro: 0.75
+      micro: 0.7
+    transitions:
+      min_gap_seconds: 60
+      min_change: 5
+      confidence_threshold: 0.8
+    zones: {}
+    metadata:
+      track_idle_time: true
+      idle_threshold_seconds: 300
+      aggregation_window: 900
+      exclude_background_apps: true
+      min_focus_duration: 30
+    schedule:
+      cron: '*/15 * * * *'
+      priority: high
+    detector: sources.mac.apps.activity
+semantics:
+  notion_pages_page:
+    source: notion
+    stream: notion_pages
+    semantic_type: page
+    display_name: Notion Pages - Page
+    description: Pages and databases from Notion workspace
+    sync_config: *id001
+    processing_config: *id002
+    storage_config: *id003
+  notion_pages_database:
+    source: notion
+    stream: notion_pages
+    semantic_type: database
+    display_name: Notion Pages - Database
+    description: Pages and databases from Notion workspace
+    sync_config: *id001
+    processing_config: *id002
+    storage_config: *id003
+transition_detectors:
+  google_calendar_events:
+    module: sources.google.calendar.events
+    class: EventsTransitionDetector
+  ios_active_energy:
+    module: sources.ios.healthkit.active_energy
+    class: ActiveEnergyTransitionDetector
+  ios_sleep:
+    module: sources.ios.healthkit.sleep
+    class: SleepTransitionDetector
+  ios_workouts:
+    module: sources.ios.healthkit.workouts
+    class: WorkoutsTransitionDetector
+  ios_heart_rate_variability:
+    module: sources.ios.healthkit.heart_rate_variability
+    class: HeartRateVariabilityTransitionDetector
+  ios_heart_rate:
+    module: sources.ios.healthkit.heart_rate
+    class: HeartRateTransitionDetector
+  ios_steps:
+    module: sources.ios.healthkit.steps
+    class: StepsTransitionDetector
+  ios_coordinates:
+    module: sources.ios.location.coordinates
+    class: CoordinatesTransitionDetector
+  ios_speed:
+    module: sources.ios.location.speed
+    class: SpeedTransitionDetector
+  ios_altitude:
+    module: sources.ios.location.altitude
+    class: AltitudeTransitionDetector
+  ios_audio_level:
+    module: sources.ios.mic.audio_level
+    class: AudioLevelTransitionDetector
+  mac_app_activity:
+    module: sources.mac.apps.activity
+    class: ActivityTransitionDetector

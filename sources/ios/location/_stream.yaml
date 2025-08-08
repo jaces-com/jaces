@@ -1,0 +1,41 @@
+# iOS Core Location Stream Configuration
+# GPS and motion data from iOS devices
+
+name: ios_location
+source: ios
+display_name: iOS Core Location
+description: Raw CoreLocation data including GPS, altitude, speed, and activity
+
+# Stream processing settings
+ingestion:
+  type: push  # Device pushes data to server
+  batch_type: array
+  raw_data_type: CLLocation
+  
+# Signals produced by this stream
+signals:
+  - altitude
+  - coordinates
+  - speed
+
+# Processing configuration
+processing:
+  deduplication:
+    strategy: timestamp  # Location points should be unique by timestamp
+  normalization: true
+  validation:
+    required_fields:
+      - latitude
+      - longitude
+      - timestamp
+    ranges:
+      latitude: [-90, 90]
+      longitude: [-180, 180]
+      altitude: [-500, 9000]  # Dead Sea to Everest
+      speed: [0, 500]  # m/s, reasonable max for aircraft
+      
+# Storage settings
+storage:
+  retention_days: 90
+  compression: gzip
+  format: json

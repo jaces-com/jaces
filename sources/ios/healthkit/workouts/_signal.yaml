@@ -1,0 +1,35 @@
+# Workouts Signal Configuration
+
+name: ios_workouts
+source: ios
+stream: healthkit
+display_name: Workout Sessions
+description: Exercise and workout tracking
+
+unit:
+  ucum: min  # minutes
+  display: minutes
+
+computation:
+  algorithm: event_detection
+  value_type: categorical
+  categories:
+    - running
+    - walking
+    - cycling
+    - swimming
+    - strength
+    - yoga
+    - other
+
+schedule:
+  cron: "*/10 * * * *"
+  priority: medium
+
+weight:
+  macro: 0.85
+  micro: 0.8
+
+transitions:
+  min_gap_seconds: 300
+  confidence_threshold: 0.9

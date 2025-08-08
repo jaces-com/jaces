@@ -1,0 +1,45 @@
+# Altitude Signal Configuration
+# Elevation tracking and change detection
+
+name: ios_altitude
+source: ios
+stream: location
+display_name: Altitude
+description: Elevation above sea level in meters
+
+# Units and measurement
+unit:
+  ucum: m  # meters
+  display: meters
+  range: [-500, 9000]  # Dead Sea to Everest
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt  # Pruned Exact Linear Time
+  cost_function: l2
+  value_type: continuous
+  min_segment_size: 5
+  penalty_multiplier: 1.0
+  gap_threshold_seconds: 900  # 15 minutes
+
+# Processing schedule
+schedule:
+  cron: "*/5 * * * *"  # Every 5 minutes
+  priority: medium
+
+# Signal importance
+weight:
+  macro: 0.6
+  micro: 0.5
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 180  # 3 minutes between transitions
+  min_change: 10  # Minimum 10m change to register
+  confidence_threshold: 0.8
+  
+# Metadata
+metadata:
+  accuracy_required: 10  # meters
+  interpolation: linear
+  smoothing: true

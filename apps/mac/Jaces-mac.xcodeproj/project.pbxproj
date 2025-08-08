@@ -1,0 +1,666 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		56FCC3F72E2C7B5000E1CB45 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 56FCC2F92E2BEC1400E1CB45 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 56FCC3E82E2C7B4E00E1CB45;
+			remoteInfo = JacesMac;
+		};
+		56FCC4012E2C7B5000E1CB45 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 56FCC2F92E2BEC1400E1CB45 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 56FCC3E82E2C7B4E00E1CB45;
+			remoteInfo = JacesMac;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		56FCC2FF2E2BEC1400E1CB45 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		56FCC3012E2BEC1400E1CB45 /* Jaces-mac */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "Jaces-mac"; sourceTree = BUILT_PRODUCTS_DIR; };
+		56FCC3E92E2C7B4E00E1CB45 /* JacesMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JacesMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		56FCC3F62E2C7B5000E1CB45 /* JacesMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JacesMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		56FCC4002E2C7B5000E1CB45 /* JacesMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JacesMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		56FCC3032E2BEC1400E1CB45 /* Jaces-mac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Jaces-mac";
+			sourceTree = "<group>";
+		};
+		56FCC3042E2BEC1400E1CB45 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		56FCC3EA2E2C7B4E00E1CB45 /* JacesMac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = JacesMac;
+			sourceTree = "<group>";
+		};
+		56FCC3F92E2C7B5000E1CB45 /* JacesMacTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = JacesMacTests;
+			sourceTree = "<group>";
+		};
+		56FCC4032E2C7B5000E1CB45 /* JacesMacUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = JacesMacUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		56FCC2FE2E2BEC1400E1CB45 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3E62E2C7B4E00E1CB45 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3F32E2C7B5000E1CB45 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3FD2E2C7B5000E1CB45 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		56FCC2F82E2BEC1400E1CB45 = {
+			isa = PBXGroup;
+			children = (
+				56FCC3032E2BEC1400E1CB45 /* Jaces-mac */,
+				56FCC3042E2BEC1400E1CB45 /* Shared */,
+				56FCC3EA2E2C7B4E00E1CB45 /* JacesMac */,
+				56FCC3F92E2C7B5000E1CB45 /* JacesMacTests */,
+				56FCC4032E2C7B5000E1CB45 /* JacesMacUITests */,
+				56FCC3022E2BEC1400E1CB45 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		56FCC3022E2BEC1400E1CB45 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				56FCC3012E2BEC1400E1CB45 /* Jaces-mac */,
+				56FCC3E92E2C7B4E00E1CB45 /* JacesMac.app */,
+				56FCC3F62E2C7B5000E1CB45 /* JacesMacTests.xctest */,
+				56FCC4002E2C7B5000E1CB45 /* JacesMacUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		56FCC3002E2BEC1400E1CB45 /* Jaces-mac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56FCC3082E2BEC1400E1CB45 /* Build configuration list for PBXNativeTarget "Jaces-mac" */;
+			buildPhases = (
+				56FCC2FD2E2BEC1400E1CB45 /* Sources */,
+				56FCC2FE2E2BEC1400E1CB45 /* Frameworks */,
+				56FCC2FF2E2BEC1400E1CB45 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				56FCC3032E2BEC1400E1CB45 /* Jaces-mac */,
+				56FCC3042E2BEC1400E1CB45 /* Shared */,
+			);
+			name = "Jaces-mac";
+			packageProductDependencies = (
+			);
+			productName = "Jaces-mac";
+			productReference = 56FCC3012E2BEC1400E1CB45 /* Jaces-mac */;
+			productType = "com.apple.product-type.tool";
+		};
+		56FCC3E82E2C7B4E00E1CB45 /* JacesMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56FCC4082E2C7B5000E1CB45 /* Build configuration list for PBXNativeTarget "JacesMac" */;
+			buildPhases = (
+				56FCC3E52E2C7B4E00E1CB45 /* Sources */,
+				56FCC3E62E2C7B4E00E1CB45 /* Frameworks */,
+				56FCC3E72E2C7B4E00E1CB45 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				56FCC3EA2E2C7B4E00E1CB45 /* JacesMac */,
+			);
+			name = JacesMac;
+			packageProductDependencies = (
+			);
+			productName = JacesMac;
+			productReference = 56FCC3E92E2C7B4E00E1CB45 /* JacesMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		56FCC3F52E2C7B5000E1CB45 /* JacesMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56FCC40B2E2C7B5000E1CB45 /* Build configuration list for PBXNativeTarget "JacesMacTests" */;
+			buildPhases = (
+				56FCC3F22E2C7B5000E1CB45 /* Sources */,
+				56FCC3F32E2C7B5000E1CB45 /* Frameworks */,
+				56FCC3F42E2C7B5000E1CB45 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				56FCC3F82E2C7B5000E1CB45 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				56FCC3F92E2C7B5000E1CB45 /* JacesMacTests */,
+			);
+			name = JacesMacTests;
+			packageProductDependencies = (
+			);
+			productName = JacesMacTests;
+			productReference = 56FCC3F62E2C7B5000E1CB45 /* JacesMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		56FCC3FF2E2C7B5000E1CB45 /* JacesMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 56FCC40E2E2C7B5000E1CB45 /* Build configuration list for PBXNativeTarget "JacesMacUITests" */;
+			buildPhases = (
+				56FCC3FC2E2C7B5000E1CB45 /* Sources */,
+				56FCC3FD2E2C7B5000E1CB45 /* Frameworks */,
+				56FCC3FE2E2C7B5000E1CB45 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				56FCC4022E2C7B5000E1CB45 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				56FCC4032E2C7B5000E1CB45 /* JacesMacUITests */,
+			);
+			name = JacesMacUITests;
+			packageProductDependencies = (
+			);
+			productName = JacesMacUITests;
+			productReference = 56FCC4002E2C7B5000E1CB45 /* JacesMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		56FCC2F92E2BEC1400E1CB45 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					56FCC3002E2BEC1400E1CB45 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					56FCC3E82E2C7B4E00E1CB45 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					56FCC3F52E2C7B5000E1CB45 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 56FCC3E82E2C7B4E00E1CB45;
+					};
+					56FCC3FF2E2C7B5000E1CB45 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 56FCC3E82E2C7B4E00E1CB45;
+					};
+				};
+			};
+			buildConfigurationList = 56FCC2FC2E2BEC1400E1CB45 /* Build configuration list for PBXProject "Jaces-mac" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 56FCC2F82E2BEC1400E1CB45;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 56FCC3022E2BEC1400E1CB45 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				56FCC3002E2BEC1400E1CB45 /* Jaces-mac */,
+				56FCC3E82E2C7B4E00E1CB45 /* JacesMac */,
+				56FCC3F52E2C7B5000E1CB45 /* JacesMacTests */,
+				56FCC3FF2E2C7B5000E1CB45 /* JacesMacUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		56FCC3E72E2C7B4E00E1CB45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3F42E2C7B5000E1CB45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3FE2E2C7B5000E1CB45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		56FCC2FD2E2BEC1400E1CB45 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3E52E2C7B4E00E1CB45 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3F22E2C7B5000E1CB45 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56FCC3FC2E2C7B5000E1CB45 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		56FCC3F82E2C7B5000E1CB45 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 56FCC3E82E2C7B4E00E1CB45 /* JacesMac */;
+			targetProxy = 56FCC3F72E2C7B5000E1CB45 /* PBXContainerItemProxy */;
+		};
+		56FCC4022E2C7B5000E1CB45 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 56FCC3E82E2C7B4E00E1CB45 /* JacesMac */;
+			targetProxy = 56FCC4012E2C7B5000E1CB45 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		56FCC3062E2BEC1400E1CB45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		56FCC3072E2BEC1400E1CB45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		56FCC3092E2BEC1400E1CB45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = JacesMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		56FCC30A2E2BEC1400E1CB45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = JacesMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		56FCC4092E2C7B5000E1CB45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = JacesMac/JacesMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = JacesMac;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = "\"\"";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		56FCC40A2E2C7B5000E1CB45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = JacesMac/JacesMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = JacesMac;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = "\"\"";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		56FCC40C2E2C7B5000E1CB45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.JacesMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JacesMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JacesMac";
+			};
+			name = Debug;
+		};
+		56FCC40D2E2C7B5000E1CB45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.JacesMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JacesMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JacesMac";
+			};
+			name = Release;
+		};
+		56FCC40F2E2C7B5000E1CB45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = JacesMac;
+				INFOPLIST_KEY_NSMainStoryboardFile = "\"\"";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = JacesMac;
+			};
+			name = Debug;
+		};
+		56FCC4102E2C7B5000E1CB45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = JacesMac;
+				INFOPLIST_KEY_NSMainStoryboardFile = "\"\"";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jaces.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = JacesMac;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		56FCC2FC2E2BEC1400E1CB45 /* Build configuration list for PBXProject "Jaces-mac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56FCC3062E2BEC1400E1CB45 /* Debug */,
+				56FCC3072E2BEC1400E1CB45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		56FCC3082E2BEC1400E1CB45 /* Build configuration list for PBXNativeTarget "Jaces-mac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56FCC3092E2BEC1400E1CB45 /* Debug */,
+				56FCC30A2E2BEC1400E1CB45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		56FCC4082E2C7B5000E1CB45 /* Build configuration list for PBXNativeTarget "JacesMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56FCC4092E2C7B5000E1CB45 /* Debug */,
+				56FCC40A2E2C7B5000E1CB45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		56FCC40B2E2C7B5000E1CB45 /* Build configuration list for PBXNativeTarget "JacesMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56FCC40C2E2C7B5000E1CB45 /* Debug */,
+				56FCC40D2E2C7B5000E1CB45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		56FCC40E2E2C7B5000E1CB45 /* Build configuration list for PBXNativeTarget "JacesMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56FCC40F2E2C7B5000E1CB45 /* Debug */,
+				56FCC4102E2C7B5000E1CB45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 56FCC2F92E2BEC1400E1CB45 /* Project object */;
+}

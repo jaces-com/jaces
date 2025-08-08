@@ -1,0 +1,54 @@
+# Speed Signal Configuration
+# Movement speed tracking and change detection
+
+name: ios_speed
+source: ios
+stream: location
+display_name: Movement Speed
+description: Speed of movement in meters per second
+
+# Units and measurement
+unit:
+  ucum: m/s  # meters per second
+  display: m/s
+  range: [0, 500]  # Up to aircraft speeds
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt
+  cost_function: l1
+  value_type: continuous
+  min_segment_size: 5
+  penalty_multiplier: 1.2
+  gap_threshold_seconds: 900  # 15 minutes
+
+# Processing schedule
+schedule:
+  cron: "*/5 * * * *"
+  priority: medium
+
+# Signal importance
+weight:
+  macro: 0.8
+  micro: 0.7
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 120  # 2 minutes between transitions
+  min_change: 1.0  # Minimum 1 m/s change
+  confidence_threshold: 0.8
+  
+# Movement categories (for semantic interpretation)
+categories:
+  stationary: [0, 0.5]
+  walking: [0.5, 2.0]
+  running: [2.0, 5.0]
+  cycling: [3.0, 10.0]
+  driving: [5.0, 50.0]
+  flying: [50.0, 500.0]
+  
+# Metadata
+metadata:
+  smoothing_window: 5  # samples
+  outlier_removal: true
+  max_acceleration: 10  # m/s²

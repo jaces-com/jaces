@@ -1,0 +1,52 @@
+# iOS HealthKit Stream Configuration
+# Health and fitness data from iOS devices
+
+name: ios_healthkit
+source: ios
+display_name: iOS HealthKit
+description: Health data including heart rate, steps, workouts, sleep, and energy
+
+# Stream processing settings
+ingestion:
+  type: push
+  batch_type: array
+  raw_data_type: HKSample
+  
+# Signals produced by this stream
+signals:
+  - heart_rate
+  - steps
+  - active_energy
+  - heart_rate_variability
+  - sleep
+  - workouts
+
+# Processing configuration
+processing:
+  deduplication:
+    strategy: content_hash  # Health data may have same timestamp for different metrics
+  normalization: true
+  validation:
+    required_fields:
+      - type
+      - value
+      - timestamp
+    ranges:
+      heart_rate: [30, 250]  # bpm
+      steps: [0, 100000]  # daily max
+      active_energy: [0, 10000]  # kcal
+      heart_rate_variability: [0, 500]  # ms
+      
+# Storage settings
+storage:
+  retention_days: 365  # Keep health data longer
+  compression: gzip
+  format: json
+  
+# Privacy settings
+privacy:
+  encryption: true
+  anonymization: false
+  compliance:
+    - HIPAA
+    - GDPR

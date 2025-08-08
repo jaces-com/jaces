@@ -1,0 +1,49 @@
+# GPS Coordinates Signal Configuration
+# Geographic location tracking and change detection
+
+name: ios_coordinates
+source: ios
+stream: location
+display_name: GPS Coordinates
+description: Latitude and longitude coordinates
+
+# Units and measurement
+unit:
+  ucum: deg  # degrees
+  display: coordinates
+  format: "lat,lng"
+
+# Transition detection algorithm
+computation:
+  algorithm: pelt
+  cost_function: l2
+  distance_metric: haversine  # For geographic coordinates
+  value_type: continuous
+  min_segment_size: 10
+  penalty_multiplier: 1.5
+  gap_threshold_seconds: 1200  # 20 minutes
+
+# Processing schedule
+schedule:
+  cron: "*/5 * * * *"
+  priority: high  # Location is fundamental
+
+# Signal importance
+weight:
+  macro: 1.0  # Highest weight - location is fundamental
+  micro: 0.95
+  
+# Transition settings
+transitions:
+  min_gap_seconds: 120  # 2 minutes between transitions
+  min_distance_meters: 100  # Minimum movement to register
+  confidence_threshold: 0.85
+  cluster_radius_meters: 50  # Cluster nearby points
+  
+# Metadata
+metadata:
+  accuracy_required: 20  # meters
+  interpolation: none  # Don't interpolate GPS
+  privacy:
+    obfuscate_home: true
+    blur_radius: 100  # meters
