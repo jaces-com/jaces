@@ -17,7 +17,7 @@ unit:
 computation:
   algorithm: pelt
   cost_function: l2
-  value_type: continuous
+  analysis_type: continuous
   min_segment_size: 10
   penalty_multiplier: 1.5
   gap_threshold_seconds: 600  # 10 minutes

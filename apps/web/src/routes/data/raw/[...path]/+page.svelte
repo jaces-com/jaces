@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Page, Badge, Button } from "$lib/components";
+    import { formatBytes, formatDate } from "$lib/utils/format";
     import { enhance } from "$app/forms";
     import { slide } from "svelte/transition";
     import { goto } from '$app/navigation';
@@ -20,18 +21,6 @@
     // Format large numbers with commas
     function formatNumber(num: number): string {
         return num.toLocaleString();
-    }
-
-    function formatFileSize(bytes: number): string {
-        if (bytes === 0) return "0 B";
-        const k = 1024;
-        const sizes = ["B", "KB", "MB", "GB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-    }
-
-    function formatDate(date: string | Date): string {
-        return new Date(date).toLocaleString();
     }
 
     function closeViewer() {
@@ -78,17 +67,6 @@
         return 'just now';
     }
     
-    function formatDateTime(date: Date): string {
-        return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true
-        });
-    }
 
     function selectEntry(key: string) {
         const entry = data.streamKeys.find(k => k.key === key);
@@ -163,7 +141,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm text-gray-600 dark:text-gray-400">Data Size</p>
-                            <p class="text-2xl font-bold">{formatFileSize(data.stats.dataSize)}</p>
+                            <p class="text-2xl font-bold">{formatBytes(data.stats.dataSize)}</p>
                         </div>
                         <iconify-icon icon="ri:database-2-line" class="text-3xl text-gray-400"></iconify-icon>
                     </div>
@@ -215,7 +193,7 @@
                                     <div>
                                         <p class="font-medium text-sm">{entry.key.split('/').pop()}</p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            {formatDateTime(new Date(entry.lastModified))} • {formatFileSize(entry.size)}
+                                            {formatDate(new Date(entry.lastModified))} • {formatBytes(entry.size)}
                                         </p>
                                     </div>
                                     <div class="flex gap-2">
@@ -283,7 +261,7 @@
                                         <div>
                                             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Timestamp</p>
                                             <p class="mt-1">
-                                                {formatDateTime(new Date(data.sampleData.timestamp || data.sampleData.fetched_at))}
+                                                {formatDate(new Date(data.sampleData.timestamp || data.sampleData.fetched_at))}
                                             </p>
                                         </div>
                                     {/if}
@@ -333,7 +311,7 @@
                             Raw Storage
                         </h1>
                         <!-- <div class="flex gap-4 text-sm text-neutral-600">
-                            <span>Total Used: {formatFileSize(data.bucketStats?.totalSize || 0)} & Total Objects: {formatNumber(data.bucketStats?.totalObjects || 0)}</span>
+                            <span>Total Used: {formatBytes(data.bucketStats?.totalSize || 0)} & Total Objects: {formatNumber(data.bucketStats?.totalObjects || 0)}</span>
                         </div> -->
                     </div>
                     <div class="text-sm text-neutral-500">
@@ -430,7 +408,7 @@
                                                     : ''}"
                                             >
                                                 {item.type === "file" && item.size
-                                                    ? formatFileSize(item.size)
+                                                    ? formatBytes(item.size)
                                                     : "-"}
                                             </td>
                                             <td

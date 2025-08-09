@@ -152,8 +152,8 @@ class HealthKitStreamProcessor:
             else:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
             
-            # Generate deterministic source event ID
-            source_event_id = generate_source_event_id('continuous', timestamp, metric)
+            # Generate deterministic source event ID (heart rate is single value per timestamp)
+            source_event_id = generate_source_event_id('single', timestamp, metric)
             
             # Extract metadata
             metadata = metric.get('metadata', {})
@@ -225,7 +225,7 @@ class HealthKitStreamProcessor:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
             
             # Generate deterministic source event ID (steps are count type)
-            source_event_id = generate_source_event_id('count', timestamp, metric)
+            source_event_id = generate_source_event_id('single', timestamp, metric)
             
             # Extract metadata
             metadata = metric.get('metadata', {})
@@ -302,7 +302,7 @@ class HealthKitStreamProcessor:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
             
             # Generate deterministic source event ID (sleep is categorical)
-            source_event_id = generate_source_event_id('categorical', timestamp, metric)
+            source_event_id = generate_source_event_id('single', timestamp, metric)
             
             # Extract metadata
             metadata = metric.get('metadata', {})
@@ -376,7 +376,7 @@ class HealthKitStreamProcessor:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
             
             # Generate deterministic source event ID (active energy is count type)
-            source_event_id = generate_source_event_id('count', timestamp, metric)
+            source_event_id = generate_source_event_id('single', timestamp, metric)
             
             # Extract metadata
             metadata = metric.get('metadata', {})
@@ -441,8 +441,8 @@ class HealthKitStreamProcessor:
             else:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
             
-            # Generate deterministic source event ID (workouts are parallel type)
-            source_event_id = generate_source_event_id('parallel', timestamp, metric)
+            # Generate deterministic source event ID (workouts allow multiple at same time)
+            source_event_id = generate_source_event_id('multiple', timestamp, metric)
             
             # Extract metadata
             metadata = metric.get('metadata', {})
@@ -517,7 +517,7 @@ class HealthKitStreamProcessor:
                 timestamp = timestamp.replace(tzinfo=tz.utc)
             
             # Generate deterministic source event ID (HRV is continuous)
-            source_event_id = generate_source_event_id('continuous', timestamp, metric)
+            source_event_id = generate_source_event_id('single', timestamp, metric)
             
             # Extract metadata
             metadata = metric.get('metadata', {})

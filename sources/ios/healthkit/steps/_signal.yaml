@@ -17,7 +17,7 @@ unit:
 computation:
   algorithm: pelt
   cost_function: l1
-  value_type: discrete
+  analysis_type: discrete
   min_segment_size: 5
   penalty_multiplier: 1.0
   gap_threshold_seconds: 1800  # 30 minutes

@@ -97,7 +97,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			const [updatedSource] = await db
 				.update(sources)
 				.set({
-					isActive: true,
+					status: 'authenticated',
 					oauthAccessToken: accessToken,
 					oauthRefreshToken: refreshToken || null,
 					oauthExpiresAt: expiresAt,
@@ -119,7 +119,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 				.values({
 					sourceName: sourceName,
 					instanceName: instanceName,
-					isActive: true,
+					status: 'authenticated',
 					oauthAccessToken: accessToken,
 					oauthRefreshToken: refreshToken || null,
 					oauthExpiresAt: expiresAt,

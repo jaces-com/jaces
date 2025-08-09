@@ -21,5 +21,6 @@ class StreamConfigs(Base):
     status = Column(String, nullable=False, default='active')
     cron_schedule = Column(String)
     settings = Column(JSON)
+    last_ingestion_at = Column(DateTime)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)

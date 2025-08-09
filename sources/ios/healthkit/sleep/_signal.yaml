@@ -12,7 +12,7 @@ unit:
   
 computation:
   algorithm: categorical
-  value_type: categorical
+  analysis_type: categorical
   categories:
     - awake
     - light

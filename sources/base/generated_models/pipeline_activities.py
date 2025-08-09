@@ -14,6 +14,9 @@ class ActivityTypeStatus(str, Enum):
     INGESTION = "ingestion"
     SIGNAL_CREATION = "signal_creation"
     TRANSITION_DETECTION = "transition_detection"
+    TOKEN_REFRESH = "token_refresh"
+    SCHEDULED_CHECK = "scheduled_check"
+    CLEANUP = "cleanup"
 
 class ActivityStatus(str, Enum):
     """activity_status enum values."""

@@ -10,6 +10,7 @@
 	} from "$lib/components";
 	import { goto } from "$app/navigation";
 	import { onDestroy } from "svelte";
+	import { toast } from "svelte-sonner";
 	import "iconify-icon";
 	import type { PageData } from "./$types";
 	import { slide } from "svelte/transition";
@@ -55,8 +56,11 @@
 		settings: Record<string, any>;
 		enabled: boolean;
 		syncSchedule: string;
+		syncType?: 'token' | 'date_range' | 'hybrid';
 		initialSyncType: "limited" | "full";
 		initialSyncDays: number;
+		initialSyncDaysFuture?: number;
+		supportsFutureSync?: boolean;
 		showAdvanced?: boolean;
 		cronValid?: boolean;
 	}
@@ -70,6 +74,13 @@
 	// Track if the user has meaningfully filled out the basic info
 	let basicInfoComplete = $derived(instanceName && instanceName.trim() !== "" && connectionDescription && connectionDescription.trim() !== "");
 	
+	// Track if all steps are complete for OAuth sources
+	let allStepsComplete = $derived(
+		basicInfoComplete && 
+		data.source.isConnected && 
+		streamConfigs.some(s => s.enabled)
+	);
+	
 	let deviceToken = $state("");
 	let generatedToken = $state("");
 	let autoSync = $state(true);
@@ -82,16 +93,55 @@
 
 	// Stream configurations - initialize each stream with its own sync settings
 	let streamConfigs = $state<StreamConfig[]>(
-		data.streams?.map((stream: any) => ({
-			...stream,
-			enabled: true,
-			syncSchedule: stream.cronSchedule || "0 * * * *", // Default to hourly
-			initialSyncType: "limited" as const,
-			initialSyncDays: 90,
-			showAdvanced: false,
-			cronValid: true,
-		})) || [],
+		data.streams?.map((stream: any) => {
+			// Check sync type from configuration
+			const syncType = stream.settings?.sync?.type || 'date_range';
+			
+			// Detect if this stream supports future sync
+			const supportsFutureSync = 
+				(stream.settings?.sync?.initial_sync_days_future !== undefined ||
+				stream.settings?.sync?.lookahead_days !== undefined ||
+				stream.name?.includes('calendar')) && syncType !== 'token';
+			
+			// Get default future days from stream config or use 30
+			const defaultFutureDays = 
+				stream.settings?.sync?.initial_sync_days_future || 
+				(stream.settings?.sync?.lookahead_days ? Math.floor(stream.settings.sync.lookahead_days / 12) : 30);
+			
+			return {
+				...stream,
+				enabled: true,
+				syncSchedule: stream.cronSchedule || "0 * * * *", // Default to hourly
+				syncType,  // Store the sync type
+				initialSyncType: syncType === 'token' ? "full" as const : "limited" as const,
+				initialSyncDays: stream.settings?.sync?.initial_sync_days || 90,
+				initialSyncDaysFuture: supportsFutureSync ? defaultFutureDays : undefined,
+				supportsFutureSync,
+				showAdvanced: false,
+				cronValid: true,
+			};
+		}) || [],
 	);
+
+	// Restore form data from localStorage if returning from OAuth
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			const storageKey = `jaces_oauth_form_${data.source.name}`;
+			const saved = localStorage.getItem(storageKey);
+			if (saved) {
+				try {
+					const formData = JSON.parse(saved);
+					instanceName = formData.instanceName || instanceName;
+					connectionDescription = formData.connectionDescription || "";
+					// Clean up after restoring
+					localStorage.removeItem(storageKey);
+				} catch (e) {
+					console.error('Failed to restore form data:', e);
+					localStorage.removeItem(storageKey);
+				}
+			}
+		}
+	});
 
 	// Validate cron expression (basic validation)
 	function validateCron(cron: string): { valid: boolean } {
@@ -164,6 +214,10 @@
 								s.initialSyncType === "limited"
 									? s.initialSyncDays
 									: null,
+							initialSyncDaysFuture:
+								s.initialSyncType === "limited" && s.supportsFutureSync
+									? s.initialSyncDaysFuture
+									: null,
 						})),
 				}),
 			});
@@ -177,6 +231,14 @@
 
 			const result = await response.json();
 
+			// Clear any saved form data on successful submission
+			localStorage.removeItem(`jaces_oauth_form_${data.source.name}`);
+
+			// Show success toast
+			toast.success("Configuration saved successfully!", {
+				description: "Starting initial sync..."
+			});
+
 			// Redirect to source detail page or sources list
 			await goto(`/data/sources/${result.id || ""}`);
 		} catch (error) {
@@ -185,6 +247,11 @@
 					? error.message
 					: "Failed to save device configuration. Please try again.";
 			console.error("Error saving device configuration:", error);
+			
+			// Show error toast
+			toast.error("Failed to save configuration", {
+				description: errorMessage
+			});
 		} finally {
 			isSubmitting = false;
 		}
@@ -193,12 +260,29 @@
 	// Handle OAuth connection
 	function handleOAuthConnect() {
 		if (data.source.oauthUrl) {
+			// Save form data to localStorage before OAuth redirect
+			const storageKey = `jaces_oauth_form_${data.source.name}`;
+			localStorage.setItem(storageKey, JSON.stringify({
+				instanceName,
+				connectionDescription
+			}));
+			
 			window.location.href = data.source.oauthUrl;
 		}
 	}
 	
 	// Handle OAuth source configuration submission
 	async function handleOAuthSubmit() {
+		// Validate basic information is complete
+		if (!basicInfoComplete) {
+			errorMessage = "Please complete the basic information (name and description)";
+			const basicInfoSection = document.querySelector('[data-basic-info-section]');
+			if (basicInfoSection) {
+				basicInfoSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+			return;
+		}
+
 		// Validate that OAuth authentication is complete
 		if (!data.source.isConnected && !data.source.existingSource?.oauth_access_token) {
 			errorMessage = `Please authenticate with ${data.source.displayName} first by clicking "Connect with ${data.source.company}"`;
@@ -215,6 +299,10 @@
 		const enabledStreams = streamConfigs.filter(s => s.enabled);
 		if (enabledStreams.length === 0) {
 			errorMessage = "Please enable at least one stream to sync";
+			const streamsSection = document.querySelector('[data-streams-section]');
+			if (streamsSection) {
+				streamsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
 			return;
 		}
 
@@ -231,6 +319,8 @@
 				body: JSON.stringify({
 					sourceName: data.source.name,
 					sourceId: data.source.existingSource?.id,
+					instanceName: instanceName,
+					description: connectionDescription,
 					streamConfigs: streamConfigs
 						.filter((s) => s.enabled)
 						.map((s) => ({
@@ -241,6 +331,10 @@
 							initialSyncDays:
 								s.initialSyncType === "limited"
 									? s.initialSyncDays
+									: null,
+							initialSyncDaysFuture:
+								s.initialSyncType === "limited" && s.supportsFutureSync
+									? s.initialSyncDaysFuture
 									: null,
 						})),
 				}),
@@ -253,14 +347,29 @@
 				);
 			}
 
-			// Redirect to sources list with success message
-			await goto("/data/sources?configured=" + data.source.name);
+			const result = await response.json();
+			
+			// Clear any saved form data on successful submission
+			localStorage.removeItem(`jaces_oauth_form_${data.source.name}`);
+
+			// Show success toast
+			toast.success("Configuration saved successfully!", {
+				description: "Starting initial sync..."
+			});
+
+			// Redirect to the source detail page
+			await goto(`/data/sources/${result.sourceId}`);
 		} catch (error) {
 			errorMessage =
 				error instanceof Error
 					? error.message
 					: "Failed to save stream configuration. Please try again.";
 			console.error("Error saving stream configuration:", error);
+			
+			// Show error toast
+			toast.error("Failed to save configuration", {
+				description: errorMessage
+			});
 		} finally {
 			isSubmitting = false;
 		}
@@ -268,6 +377,8 @@
 
 	// Handle cancel
 	function handleCancel() {
+		// Clear any saved form data when cancelling
+		localStorage.removeItem(`jaces_oauth_form_${data.source.name}`);
 		goto("/data/sources");
 	}
 
@@ -376,7 +487,7 @@
 			{/if}
 
 			<!-- Basic Information Section -->
-			<div class="bg-white border border-neutral-200 rounded-lg p-6 mb-6">
+			<div class="bg-white border border-neutral-200 rounded-lg p-6 mb-6" data-basic-info-section>
 				<h2 class="text-lg font-mono text-neutral-900 mb-4">
 					1. Basic information
 				</h2>
@@ -641,6 +752,7 @@
 			{#if streamConfigs.length > 0}
 				<div
 					class="bg-white border border-neutral-200 rounded-lg p-6 mb-6"
+					data-streams-section
 				>
 					<h2 class="text-lg font-mono text-neutral-900 mb-4">
 						3. Stream configurations
@@ -710,15 +822,16 @@
 													class="mt-4 space-y-6"
 												>
 													<!-- Initial sync configuration -->
-													<div
-														class="border-t border-neutral-200 pt-4"
-													>
-														<h4
-															class="text-sm font-medium text-neutral-700 mb-3"
+													{#if stream.syncType !== 'token'}
+														<div
+															class="border-t border-neutral-200 pt-4"
 														>
-															Initial Sync
-														</h4>
-														<div class="space-y-3">
+															<h4
+																class="text-sm font-medium text-neutral-700 mb-3"
+															>
+																Initial Sync
+															</h4>
+															<div class="space-y-3">
 															<Radio
 																name="initial-sync-{index}"
 																value="limited"
@@ -733,26 +846,57 @@
 
 															{#if stream.initialSyncType === "limited"}
 																<div
-																	class="ml-7"
+																	class="ml-7 space-y-3"
 																>
-																	<label
-																		for="stream-{index}-lookback"
-																		class="block text-sm font-medium text-neutral-700 mb-1"
-																	>
-																		Lookback
-																		period
-																		(days)
-																	</label>
-																	<Input
-																		id="stream-{index}-lookback"
-																		type="number"
-																		bind:value={
-																			stream.initialSyncDays
-																		}
-																		min={1}
-																		max={365}
-																		placeholder="90"
-																	/>
+																	<div>
+																		<label
+																			for="stream-{index}-lookback"
+																			class="block text-sm font-medium text-neutral-700 mb-1"
+																		>
+																			Lookback
+																			period
+																			(days)
+																		</label>
+																		<Input
+																			id="stream-{index}-lookback"
+																			type="number"
+																			bind:value={
+																				stream.initialSyncDays
+																			}
+																			min={1}
+																			max={365}
+																			placeholder="90"
+																		/>
+																		<p class="text-xs text-neutral-500 mt-1">
+																			How many days of past data to sync
+																		</p>
+																	</div>
+																	
+																	{#if stream.supportsFutureSync}
+																		<div>
+																			<label
+																				for="stream-{index}-lookahead"
+																				class="block text-sm font-medium text-neutral-700 mb-1"
+																			>
+																				Lookahead
+																				period
+																				(days)
+																			</label>
+																			<Input
+																				id="stream-{index}-lookahead"
+																				type="number"
+																				bind:value={
+																					stream.initialSyncDaysFuture
+																				}
+																				min={1}
+																				max={365}
+																				placeholder="30"
+																			/>
+																			<p class="text-xs text-neutral-500 mt-1">
+																				How many days of future data to sync (e.g., upcoming calendar events)
+																			</p>
+																		</div>
+																	{/if}
 																</div>
 															{/if}
 
@@ -767,8 +911,19 @@
 																label="Full sync"
 																description="Sync all available historical data"
 															/>
+															</div>
 														</div>
-													</div>
+													{:else}
+														<!-- Token-based sync info -->
+														<div class="border-t border-neutral-200 pt-4">
+															<div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+																<p class="text-sm text-blue-700">
+																	This source uses sync tokens for efficient incremental updates. 
+																	The initial sync will fetch all available data.
+																</p>
+															</div>
+														</div>
+													{/if}
 
 													<!-- Incremental sync configuration -->
 													<div
@@ -863,7 +1018,7 @@
 				{:else if data.source.authType === "oauth2"}
 					<Button
 						text={data.source.isConnected ? "Save & Sync" : "Authenticate First"}
-						variant={data.source.isConnected ? "filled" : "outline"}
+						variant={data.source.isConnected && allStepsComplete ? "filled" : "outline"}
 						onclick={data.source.isConnected ? handleOAuthSubmit : () => {
 							errorMessage = `Please authenticate with ${data.source.displayName} first`;
 							const authSection = document.querySelector('[data-auth-section]');
@@ -871,8 +1026,14 @@
 								authSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
 							}
 						}}
-						disabled={isSubmitting || !data.source.isConnected}
-						title={!data.source.isConnected ? "You must authenticate with " + data.source.company + " before saving" : "Save configuration and start syncing"}
+						disabled={isSubmitting || !allStepsComplete}
+						title={!data.source.isConnected 
+							? "You must authenticate with " + data.source.company + " before saving" 
+							: !basicInfoComplete 
+								? "Please complete the basic information (name and description)"
+								: !streamConfigs.some(s => s.enabled)
+									? "Please enable at least one stream to sync"
+									: "Save configuration and start syncing"}
 					/>
 				{:else}
 					<Button

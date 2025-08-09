@@ -1,6 +1,14 @@
 # Claude's Readme
 
-Here is the monorepo's structure:
+Important instruction reminders:
+
+- Do what has been asked; nothing more, nothing less.
+- NEVER create files unless they're absolutely necessary for achieving your goal.
+- ALWAYS prefer editing an existing file to creating a new one.
+- NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+- Run commands within the Docker container with docker compose exec.
+
+## Monorepo Structure
 
 ``` txt
 jaces/
@@ -130,9 +138,3 @@ The Jaces platform follows a three-tier data architecture: **sources → streams
 - **Type safety** with TypeScript and Python type hints
 - **Automated schema generation** from Drizzle to Python models (run `pnpm db:python` in apps/web/)
 - **Comprehensive error handling** and retry mechanisms
-
-# Important Instruction Reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

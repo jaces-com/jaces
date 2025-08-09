@@ -72,13 +72,13 @@ class MacAppActivityStreamProcessor:
                 if timestamp.tzinfo:
                     timestamp = timestamp.astimezone(tz.utc).replace(tzinfo=None)
             
-            # Generate deterministic source event ID (mac apps are categorical type)
+            # Generate deterministic source event ID (mac apps are single value per timestamp)
             event_data = {
                 'app_name': app_name,
                 'bundle_id': bundle_id,
                 'event_type': signal_type
             }
-            source_event_id = generate_source_event_id('categorical', timestamp, event_data)
+            source_event_id = generate_source_event_id('single', timestamp, event_data)
             
             # Determine signal name based on event type
             signal_type = event.get('signalType', 'unknown')

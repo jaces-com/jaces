@@ -22,7 +22,8 @@ export const streams = pgTable('streams', {
   // Sync configuration
   syncSchedule: varchar('sync_schedule'), // Custom cron schedule (overrides stream_config default)
   initialSyncType: varchar('initial_sync_type').default('limited'), // 'limited' or 'full'
-  initialSyncDays: integer('initial_sync_days').default(90), // Days to sync for limited initial sync
+  initialSyncDays: integer('initial_sync_days').default(90), // Days to sync for limited initial sync (past)
+  initialSyncDaysFuture: integer('initial_sync_days_future').default(30), // Days to sync for limited initial sync (future)
   
   // Custom settings for this stream instance
   settings: json('settings').$type<Record<string, any>>().default({}),
@@ -31,6 +32,7 @@ export const streams = pgTable('streams', {
   lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
   lastSyncStatus: varchar('last_sync_status'), // 'success', 'failed', 'in_progress'
   lastSyncError: varchar('last_sync_error'),
+  syncCursor: varchar('sync_cursor'), // Stores sync tokens/cursors for incremental sync
   
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

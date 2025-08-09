@@ -2,8 +2,8 @@
 
 import json
 import asyncio
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Optional, List, Dict, Any, Tuple
 from uuid import uuid4
 import httpx
 
@@ -12,34 +12,50 @@ from sources.base.storage.minio import store_raw_data
 from sources.base.generated_models.signals import Signals
 from sources.base.generated_models.episodic_signals import EpisodicSignals
 from sources.base.storage.database import AsyncSessionLocal
+from sources.base.interfaces.sync import BaseSync
 
 
-class GoogleCalendarSync:
+class GoogleCalendarSync(BaseSync):
     """Handles incremental sync of Google Calendar data."""
 
     MAX_RETRIES = 3
     RETRY_DELAY = 1.0  # seconds
     requires_credentials = True  # This source requires OAuth credentials
 
-    # Sync time windows
-    INITIAL_SYNC_YEARS_PAST = 2  # How far back to look on first sync
-    INITIAL_SYNC_YEARS_FUTURE = 1  # How far ahead to look on first sync
-    INCREMENTAL_SYNC_DAYS_PAST = 30  # Fallback for incremental sync without token
-    INCREMENTAL_SYNC_DAYS_FUTURE = 14  # How far ahead for incremental sync
-
-    def __init__(self, signal: Signals, access_token: str, token_refresher=None):
-        self.signal = signal
+    def __init__(self, stream, access_token: str, token_refresher=None):
+        """Initialize the sync handler."""
+        super().__init__(stream, access_token, token_refresher)
         self.client = GoogleCalendarClient(access_token, token_refresher)
-        # Normalizer removed - now using stream processors
-        # self.normalizer = GoogleCalendarNormalizer(
-        #     fidelity_score=signal.fidelity_score,
-        #     insider_tip=signal.description  # Using description field for insider tips
-        # )
-        # Storage will be handled via streams
-
-    async def run(self) -> Dict[str, Any]:
+        # For backward compatibility, allow both 'stream' and 'signal' attribute names
+        self.signal = stream
+    
+    def get_full_sync_range(self) -> Tuple[datetime, datetime]:
         """
-        Execute incremental sync for Google Calendar.
+        Google Calendar uses sync tokens, not date ranges.
+        Return None to signal token-based sync.
+        """
+        # We don't use date ranges - we use sync tokens
+        return (None, None)
+    
+    def get_incremental_sync_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """
+        Google Calendar always uses sync tokens for proper change tracking.
+        Returns None, None to use sync tokens exclusively.
+        """
+        # Always use sync tokens - no date ranges
+        return (None, None)
+    
+    async def fetch_data(self, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict[str, Any]:
+        """
+        Fetch data for the given date range.
+        If dates are None, uses sync tokens for incremental sync.
+        """
+        # This wraps the existing run() logic
+        return await self._run_sync(start_date, end_date)
+
+    async def _run_sync(self, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict[str, Any]:
+        """
+        Internal sync implementation that handles both token and date-based sync.
 
         Returns:
             Dict with sync statistics (events_processed, errors, etc.)
@@ -48,7 +64,7 @@ class GoogleCalendarSync:
             "events_processed": 0,
             "calendars_synced": 0,
             "errors": [],
-            "started_at": datetime.utcnow(),
+            "started_at": datetime.now(timezone.utc),
             "completed_at": None
         }
 
@@ -62,9 +78,22 @@ class GoogleCalendarSync:
                 selected_calendar_ids = self.signal.settings["calendar_ids"]
                 print(f"Using selected calendars from settings: {selected_calendar_ids}")
 
-            # Store the next sync token we'll save at the end
-            next_sync_token = None
-            calendar_sync_tokens = {}  # Store sync tokens per calendar
+            # Load existing sync tokens (stored as JSON dict per calendar)
+            existing_sync_tokens = {}
+            if hasattr(self.signal, 'sync_token') and self.signal.sync_token:
+                try:
+                    # Try to parse as JSON dict
+                    existing_sync_tokens = json.loads(self.signal.sync_token)
+                    print(f"Loaded sync tokens for {len(existing_sync_tokens)} calendars")
+                except (json.JSONDecodeError, TypeError):
+                    # Backward compatibility: might be a single token string
+                    print("Warning: sync_token is not valid JSON, treating as legacy single token")
+                    if self.signal.sync_token:
+                        # Use the single token for primary calendar only
+                        existing_sync_tokens = {"primary": self.signal.sync_token}
+            
+            # Store the new sync tokens we'll save at the end
+            calendar_sync_tokens = {}  # Store new sync tokens per calendar
 
             for calendar in calendars:
                 calendar_id = calendar["id"]
@@ -83,8 +112,13 @@ class GoogleCalendarSync:
                 print(f"Processing calendar: {calendar_id}")
                 stats["calendars_synced"] += 1
 
-                # Try incremental sync with token first
-                use_sync_token = self.signal.sync_token if hasattr(self.signal, 'sync_token') else None
+                # Try incremental sync with token for THIS specific calendar
+                use_sync_token = existing_sync_tokens.get(calendar_id)
+                if use_sync_token and use_sync_token.strip():  # Check for non-empty token
+                    print(f"Using existing sync token for calendar {calendar_id}: {use_sync_token[:20]}...")
+                else:
+                    use_sync_token = None  # Ensure it's None, not empty string
+                    print(f"No sync token found for calendar {calendar_id}, will do full sync")
                 fallback_to_time_sync = False
 
                 # Paginate through events
@@ -101,41 +135,31 @@ class GoogleCalendarSync:
                                 )
                             except httpx.HTTPStatusError as e:
                                 if e.response.status_code == 410:
-                                    # Sync token invalid - fall back to time-based sync
+                                    # Sync token invalid - do full sync to get new token
                                     print(
-                                        f"Sync token expired for calendar {calendar_id}, falling back to time-based sync")
+                                        f"Sync token expired for calendar {calendar_id}, doing full sync to get new token")
                                     stats["errors"].append({
                                         "calendar_id": calendar_id,
-                                        "error": "Sync token expired (410), using time-based sync",
+                                        "error": "Sync token expired (410), doing full sync",
                                         "type": "sync_token_expired"
                                     })
-                                    fallback_to_time_sync = True
+                                    fallback_to_time_sync = True  # This now means "do full sync"
                                     use_sync_token = None
                                     page_token = None  # Reset pagination
-                                    continue  # Retry with time-based sync
+                                    continue  # Retry with full sync
                                 else:
                                     raise
                         else:
-                            # Time-based sync (fallback or no sync token)
-                            is_initial_sync = self.signal.last_successful_ingestion_at is None if hasattr(self.signal, 'last_successful_ingestion_at') else True
-
-                            if is_initial_sync:
-                                # First sync - get comprehensive historical data
-                                time_min = datetime.utcnow() - timedelta(days=365 * self.INITIAL_SYNC_YEARS_PAST)
-                                time_max = datetime.utcnow() + timedelta(days=365 * self.INITIAL_SYNC_YEARS_FUTURE)
-                                print(
-                                    f"Initial sync for calendar {calendar_id}: fetching {self.INITIAL_SYNC_YEARS_PAST} years past to {self.INITIAL_SYNC_YEARS_FUTURE} year future")
-                            else:
-                                # Incremental fallback (when sync token fails)
-                                time_min = self.signal.last_successful_ingestion_at if hasattr(self.signal, 'last_successful_ingestion_at') else datetime.utcnow() - timedelta(days=self.INCREMENTAL_SYNC_DAYS_PAST)
-                                time_max = datetime.utcnow() + timedelta(days=self.INCREMENTAL_SYNC_DAYS_FUTURE)
-
+                            # No sync token - do a full sync to get one
+                            print(f"No sync token for calendar {calendar_id}, doing full sync to get token")
+                            
+                            # Full sync without date filters to get sync token
+                            # Note: Cannot use singleEvents or orderBy with sync tokens
                             result = await self.client.list_events(
                                 calendar_id=calendar_id,
-                                time_min=time_min,
-                                time_max=time_max,
                                 page_token=page_token,
-                                single_events=True,
+                                single_events=False,  # MUST be False to get sync tokens
+                                order_by="updated",  # Use 'updated' instead of 'startTime'
                                 show_deleted=True  # Include deleted events
                             )
 
@@ -169,7 +193,13 @@ class GoogleCalendarSync:
                         if "nextSyncToken" in result and not result.get("nextPageToken"):
                             calendar_sync_tokens[calendar_id] = result["nextSyncToken"]
                             print(
-                                f"Received sync token for calendar {calendar_id}")
+                                f"Received new sync token for calendar {calendar_id}: {result['nextSyncToken'][:20]}...")
+                        else:
+                            # Debug: log what we got instead
+                            if result.get("nextPageToken"):
+                                print(f"Got nextPageToken for calendar {calendar_id}, will fetch next page")
+                            else:
+                                print(f"No nextSyncToken in result for calendar {calendar_id}. Keys: {list(result.keys())}")
 
                         # Check for next page
                         page_token = result.get("nextPageToken")
@@ -203,11 +233,12 @@ class GoogleCalendarSync:
                         })
                         break
 
-            # Use the sync token from the primary calendar (first non-failed calendar)
-            # Prefer the user's main calendar over other calendars like holidays
-            for cal_id, token in calendar_sync_tokens.items():
-                if "@jaces.com" in cal_id or not next_sync_token:  # Prefer primary calendar
-                    next_sync_token = token
+            # Merge new sync tokens with existing ones (for calendars we didn't sync)
+            # This preserves tokens for calendars that weren't selected this time
+            all_sync_tokens = existing_sync_tokens.copy()
+            all_sync_tokens.update(calendar_sync_tokens)
+            
+            print(f"Total sync tokens after merge: {len(all_sync_tokens)} calendars")
 
             # Store all events as a stream batch
             if hasattr(self, '_all_events') and self._all_events:
@@ -219,8 +250,8 @@ class GoogleCalendarSync:
                     "batch_metadata": {
                         "total_events": len(self._all_events),
                         "calendars_synced": stats["calendars_synced"],
-                        "sync_type": "incremental" if next_sync_token else "full",
-                        "fetched_at": datetime.utcnow().isoformat()
+                        "sync_type": "incremental" if calendar_sync_tokens else "full",
+                        "fetched_at": datetime.now(timezone.utc).isoformat()
                     }
                 }
                 
@@ -229,7 +260,7 @@ class GoogleCalendarSync:
                     stream_name="google_calendar_events",
                     connection_id=str(self.signal.id),
                     data=stream_data,
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(timezone.utc)
                 )
                 
                 # Process the stream immediately
@@ -238,9 +269,12 @@ class GoogleCalendarSync:
                 
                 stats["stream_key"] = stream_key
             
-            stats["completed_at"] = datetime.utcnow()
-            stats["next_sync_token"] = next_sync_token
+            stats["completed_at"] = datetime.now(timezone.utc)
+            # Return sync tokens as JSON string dict
+            stats["next_sync_token"] = json.dumps(all_sync_tokens) if all_sync_tokens else None
             stats["is_initial_sync"] = self.signal.last_successful_ingestion_at is None if hasattr(self.signal, 'last_successful_ingestion_at') else True
+            
+            print(f"Sync complete. Returning {len(all_sync_tokens)} sync tokens for next run")
 
         except Exception as e:
             stats["errors"].append({

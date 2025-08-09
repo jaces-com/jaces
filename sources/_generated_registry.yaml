@@ -1,5 +1,5 @@
 version: 2.0.0
-generated_at: '2025-08-08T16:57:49.946119'
+generated_at: '2025-08-09T15:54:12.476850'
 sources:
   google:
     path: google/
@@ -19,8 +19,6 @@ sources:
       token_refresh_window: 300
     sync:
       type: pull
-      default_lookback_days: 90
-      default_lookahead_days: 360
       page_size: 100
     requirements: {}
     streams:
@@ -98,9 +96,6 @@ sources:
       token_refresh_window: 0
     sync:
       type: pull
-      default_lookback_days: 90
-      supports_incremental: true
-      supports_cursor: true
     requirements: {}
     streams:
     - notion_pages
@@ -164,18 +159,8 @@ streams:
       raw_data_type: CalendarEvent
     sync:
       schedule: '*/15 * * * *'
-      lookback_days: 90
-      lookahead_days: 360
-      calendars:
-      - primary
-      - work
-      - personal
-      exclude_patterns:
-      - Busy
-      - Out of Office
+      type: token
     processing:
-      deduplication:
-        strategy: content_hash
       normalization: true
       validation:
         required_fields:
@@ -183,10 +168,7 @@ streams:
         - summary
         - start
         - end
-    storage:
-      retention_days: 400
-      compression: gzip
-      format: json
+    storage: {}
     signals:
     - google_calendar_events
     semantics: []
@@ -328,22 +310,7 @@ streams:
       raw_data_type: NotionPage
     sync: &id001
       schedule: '*/30 * * * *'
-      modes:
-        initial:
-          description: Fetch all accessible pages in workspace
-          fetch_all: true
-          filter: none
-          use_cursor: false
-        incremental:
-          description: Fetch only changed pages since last sync
-          use_cursor: true
-          filter: last_edited_time
-          lookback_minutes: 35
-        full_refresh:
-          description: Re-fetch all pages and compare for changes
-          fetch_all: true
-          compare_hash: true
-          use_cursor: false
+      type: token
     processing: &id002
       extract_text: true
       extract_metadata: true
@@ -360,10 +327,7 @@ streams:
         - object
         - created_time
         - last_edited_time
-    storage: &id003
-      retention: unlimited
-      compression: gzip
-      format: json
+    storage: {}
     signals: []
     semantics:
     - page
@@ -419,13 +383,13 @@ signals:
       range:
       - 0
       - 10
-    value_type: categorical
+    value_type: continuous
     algorithm: pelt
     cost_function: l1
     computation:
       algorithm: pelt
       cost_function: l1
-      value_type: categorical
+      analysis_type: categorical
       min_segment_size: 5
       penalty_multiplier: 1.2
       gap_threshold_seconds: 3600
@@ -464,7 +428,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l1
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 5
       penalty_multiplier: 1.2
       gap_threshold_seconds: 1800
@@ -491,12 +455,12 @@ signals:
     unit:
       ucum: h
       display: hours
-    value_type: categorical
+    value_type: continuous
     algorithm: categorical
     cost_function: l2
     computation:
       algorithm: categorical
-      value_type: categorical
+      analysis_type: categorical
       categories:
       - awake
       - light
@@ -525,12 +489,12 @@ signals:
     unit:
       ucum: min
       display: minutes
-    value_type: categorical
+    value_type: continuous
     algorithm: event_detection
     cost_function: l2
     computation:
       algorithm: event_detection
-      value_type: categorical
+      analysis_type: categorical
       categories:
       - running
       - walking
@@ -569,7 +533,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l2
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 10
       penalty_multiplier: 2.0
       gap_threshold_seconds: 3600
@@ -604,7 +568,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l2
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 600
@@ -639,13 +603,13 @@ signals:
       range:
       - 0
       - 100000
-    value_type: discrete
+    value_type: continuous
     algorithm: pelt
     cost_function: l1
     computation:
       algorithm: pelt
       cost_function: l1
-      value_type: discrete
+      analysis_type: discrete
       min_segment_size: 5
       penalty_multiplier: 1.0
       gap_threshold_seconds: 1800
@@ -685,7 +649,7 @@ signals:
       algorithm: pelt
       cost_function: l2
       distance_metric: haversine
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 1200
@@ -726,7 +690,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l1
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 5
       penalty_multiplier: 1.2
       gap_threshold_seconds: 900
@@ -764,7 +728,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l2
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 5
       penalty_multiplier: 1.0
       gap_threshold_seconds: 900
@@ -802,7 +766,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l1
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 600
@@ -837,7 +801,7 @@ signals:
     computation:
       algorithm: pelt
       cost_function: l2
-      value_type: continuous
+      analysis_type: continuous
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 300
@@ -868,7 +832,7 @@ semantics:
     description: Pages and databases from Notion workspace
     sync_config: *id001
     processing_config: *id002
-    storage_config: *id003
+    storage_config: {}
   notion_pages_database:
     source: notion
     stream: notion_pages
@@ -877,7 +841,7 @@ semantics:
     description: Pages and databases from Notion workspace
     sync_config: *id001
     processing_config: *id002
-    storage_config: *id003
+    storage_config: {}
 transition_detectors:
   google_calendar_events:
     module: sources.google.calendar.events

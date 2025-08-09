@@ -15,6 +15,8 @@ app = Celery(
     backend=REDIS_URL,
     include=[
         "sources.base.scheduler.tasks.sync_sources",
+        "sources.base.scheduler.tasks.token_refresh",
+        "sources.base.scheduler.tasks.maintenance_tasks",
         "sources.base.scheduler.tasks.process_streams",
         "sources.base.scheduler.tasks.signal_analysis"
     ]
@@ -41,10 +43,10 @@ app.conf.update(
 
 # Beat schedule for periodic tasks
 app.conf.beat_schedule = {
-    # Run source syncs every 5 minutes to check for scheduled syncs
+    # Run source syncs every minute to check for scheduled syncs
     "check-scheduled-syncs": {
         "task": "check_scheduled_syncs",
-        "schedule": crontab(minute="*/1"),
+        "schedule": crontab(minute="*"),
     },
 
     # Daily cleanup of old ingestion runs

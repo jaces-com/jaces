@@ -126,6 +126,8 @@ services:
       # Google OAuth credentials
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Auth proxy URL
+      AUTH_PROXY_URL: https://auth.jaces.com
     volumes:
       # Mount for hot reload in development
       - ./sources:/app/sources

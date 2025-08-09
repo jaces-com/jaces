@@ -1,6 +1,9 @@
 import { pgTable, varchar, uuid, boolean, timestamp, json, text, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sourceConfigs } from './source_configs';
 
+// Source status enum
+export type SourceStatus = 'authenticated' | 'active' | 'paused' | 'needs_reauth' | 'error';
+
 export const sources = pgTable('sources', {
   // Primary key
   id: uuid('id').primaryKey().defaultRandom().notNull(),
@@ -14,7 +17,7 @@ export const sources = pgTable('sources', {
   instanceName: varchar('instance_name').notNull(), // e.g., "John's iPhone", "Work Calendar"
 
   // Status
-  isActive: boolean('is_active').notNull().default(true),
+  status: varchar('status').$type<SourceStatus>().notNull().default('authenticated'),
 
   // Device-specific fields (for device sources)
   deviceId: varchar('device_id'), // Unique device identifier

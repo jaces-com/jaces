@@ -9,18 +9,16 @@ from datetime import datetime
 from typing import Dict, Any
 
 
-def generate_source_event_id(value_type: str, timestamp: datetime, data: Dict[str, Any]) -> str:
+def generate_source_event_id(dedup_strategy: str, timestamp: datetime, data: Dict[str, Any]) -> str:
     """
-    Generate deterministic source_event_id based on signal computation value_type.
+    Generate deterministic source_event_id based on deduplication strategy.
     
-    For time-series value types (continuous, binary, categorical, spatial, count):
-    - Uses timestamp only, enforcing one value per timestamp
-    
-    For event value type:
-    - Includes unique content identifier to allow multiple concurrent values
+    Deduplication strategies:
+    - 'single': One value per timestamp (time-series data like heart rate, temperature)
+    - 'multiple': Multiple values allowed at same timestamp (events like calendar, workouts)
     
     Args:
-        value_type: Signal computation value_type ('continuous', 'binary', 'categorical', 'spatial', 'count', 'event')
+        dedup_strategy: Deduplication strategy ('single' or 'multiple')
         timestamp: Timestamp of the signal
         data: Signal data dict containing value and metadata
         
@@ -28,9 +26,9 @@ def generate_source_event_id(value_type: str, timestamp: datetime, data: Dict[st
         Deterministic source_event_id string
     """
     
-    if value_type == 'event':
-        # For event data, include unique content to allow overlaps
-        # Try to find a unique identifier in the data
+    if dedup_strategy == 'multiple':
+        # Multiple events can exist at the same timestamp
+        # Include unique content identifier to distinguish them
         content_key = (
             data.get('event_id') or 
             data.get('id') or
@@ -41,20 +39,22 @@ def generate_source_event_id(value_type: str, timestamp: datetime, data: Dict[st
             ).hexdigest()[:8]
         )
         return f"{timestamp.isoformat()}:{content_key}"
-    else:
-        # Time-series data: one value per timestamp
+    elif dedup_strategy == 'single':
+        # Only one value allowed per timestamp
         # This enforces that signals can only have one value at any given time
         return timestamp.isoformat()
+    else:
+        raise ValueError(f"Invalid dedup_strategy: {dedup_strategy}. Must be 'single' or 'multiple'")
 
 
-def should_deduplicate_by_timestamp_only(value_type: str) -> bool:
+def should_deduplicate_by_timestamp_only(dedup_strategy: str) -> bool:
     """
-    Determine if a signal value_type should deduplicate by timestamp only.
+    Determine if a signal should deduplicate by timestamp only.
     
     Args:
-        value_type: Signal computation value_type
+        dedup_strategy: Deduplication strategy ('single' or 'multiple')
         
     Returns:
         True if deduplication should be by timestamp only, False if content matters
     """
-    return value_type != 'event'
+    return dedup_strategy == 'single'

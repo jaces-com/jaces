@@ -64,6 +64,88 @@
 
 		return () => clearInterval(timer);
 	});
+
+	// Get status badge variant for a source
+	function getStatusBadgeVariant(source: any): "success" | "error" | "warning" | "default" | "info" {
+		if (!source.is_connected) {
+			return source.enabled ? "info" : "default";
+		}
+		
+		switch (source.status) {
+			case 'active':
+				return 'success';
+			case 'authenticated':
+				return 'warning';
+			case 'paused':
+				return 'default';
+			case 'needs_reauth':
+			case 'error':
+				return 'error';
+			default:
+				return 'default';
+		}
+	}
+
+	// Get status display text for a source
+	function getStatusText(source: any): string {
+		if (!source.is_connected) {
+			return source.enabled ? 'Available' : 'Disabled';
+		}
+		
+		switch (source.status) {
+			case 'authenticated':
+				return 'Setup Required';
+			case 'active':
+				return 'Active';
+			case 'paused':
+				return 'Paused';
+			case 'needs_reauth':
+				return 'Reconnect';
+			case 'error':
+				return 'Error';
+			default:
+				return 'Unknown';
+		}
+	}
+
+	// Get button text based on source status
+	function getButtonText(source: any): string {
+		if (!source.is_connected) {
+			return 'Connect';
+		}
+		
+		switch (source.status) {
+			case 'authenticated':
+				return 'Configure';
+			case 'active':
+				return 'View';
+			case 'paused':
+				return 'Resume';
+			case 'needs_reauth':
+				return 'Reconnect';
+			case 'error':
+				return 'Fix';
+			default:
+				return 'View';
+		}
+	}
+
+	// Get button href based on source status
+	function getButtonHref(source: any): string {
+		if (!source.is_connected) {
+			return `/data/sources/new?source=${source.name}`;
+		}
+		
+		if (source.status === 'authenticated') {
+			return `/data/sources/new?source=${source.name}&configure=true`;
+		}
+		
+		if (source.status === 'needs_reauth') {
+			return `/data/sources/new?source=${source.name}&reauth=true`;
+		}
+		
+		return `/data/sources/${source.id}`;
+	}
 </script>
 
 <Page>
@@ -99,16 +181,12 @@
 							onmouseenter={() => (hoveredSource = source.name)}
 							onmouseleave={() => (hoveredSource = null)}
 							onclick={() => {
-								window.location.href = source.is_connected 
-									? `/data/sources/${source.name}`
-									: `/data/sources/new?source=${source.name}`;
+								window.location.href = getButtonHref(source);
 							}}
 							onkeydown={(e) => {
 								if (e.key === "Enter" || e.key === " ") {
 									e.preventDefault();
-									window.location.href = source.is_connected 
-										? `/data/sources/${source.name}`
-										: `/data/sources/new?source=${source.name}`;
+									window.location.href = getButtonHref(source);
 								}
 							}}
 						>
@@ -150,23 +228,10 @@
 										</h3>
 									</div>
 									<Badge
-										variant={source.is_connected &&
-										source.is_active
-											? "success"
-											: source.is_connected
-												? "default"
-												: source.enabled
-													? "info"
-													: "danger"}
+										variant={getStatusBadgeVariant(source)}
 										size="sm"
 									>
-										{source.is_connected
-											? source.is_active
-												? "active"
-												: "inactive"
-											: source.enabled
-												? "available"
-												: "disabled"}
+										{getStatusText(source)}
 									</Badge>
 								</div>
 								<p class="text-sm text-neutral-600 my-4">
@@ -192,12 +257,8 @@
 								</div>
 								<div class="mt-4">
 									<Button
-										href={source.is_connected
-											? `/data/sources/${source.name}`
-											: `/data/sources/new?source=${source.name}`}
-										text={source.is_connected
-											? "View"
-											: "Connect"}
+										href={getButtonHref(source)}
+										text={getButtonText(source)}
 										type="link"
 										variant={source.is_connected
 											? "filled"

@@ -3,7 +3,7 @@
 import httpx
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Callable
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 
 
 class GoogleCalendarClient:
@@ -40,14 +40,18 @@ class GoogleCalendarClient:
                     # Call the token refresher
                     new_access_token = await self.token_refresher()
                     
-                    # Update our token and headers
-                    self.access_token = new_access_token
-                    self._update_headers()
-                    
-                    # Retry the request once
-                    response = await client.request(method, url, headers=self.headers, **kwargs)
-                except Exception:
+                    if new_access_token:
+                        # Update our token and headers
+                        self.access_token = new_access_token
+                        self._update_headers()
+                        
+                        # Retry the request once
+                        response = await client.request(method, url, headers=self.headers, **kwargs)
+                except Exception as e:
                     # If refresh fails, return the original 401 response
+                    # Log the error but don't raise it
+                    import sys
+                    print(f"Token refresh failed: {str(e)}", file=sys.stderr)
                     pass
             
             return response
@@ -109,14 +113,28 @@ class GoogleCalendarClient:
             params["showDeleted"] = show_deleted
             
             if time_min:
+                # Remove microseconds and timezone info for Google Calendar API compatibility
+                if hasattr(time_min, 'replace'):
+                    time_min = time_min.replace(microsecond=0)
+                    # If timezone-aware, convert to naive UTC
+                    if time_min.tzinfo is not None:
+                        time_min = time_min.replace(tzinfo=None)
                 params["timeMin"] = time_min.isoformat() + "Z"
             if time_max:
+                # Remove microseconds and timezone info for Google Calendar API compatibility
+                if hasattr(time_max, 'replace'):
+                    time_max = time_max.replace(microsecond=0)
+                    # If timezone-aware, convert to naive UTC
+                    if time_max.tzinfo is not None:
+                        time_max = time_max.replace(tzinfo=None)
                 params["timeMax"] = time_max.isoformat() + "Z"
                 
         if page_token:
             params["pageToken"] = page_token
         
-        url = f"{self.BASE_URL}/calendars/{calendar_id}/events?{urlencode(params)}"
+        # Properly URL-encode calendar ID to handle special characters like #
+        calendar_id_encoded = quote(calendar_id, safe='')
+        url = f"{self.BASE_URL}/calendars/{calendar_id_encoded}/events?{urlencode(params)}"
         
         response = await self._make_request("GET", url)
         response.raise_for_status()
