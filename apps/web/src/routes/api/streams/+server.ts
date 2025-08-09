@@ -20,6 +20,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					syncSchedule: streams.syncSchedule,
 					initialSyncType: streams.initialSyncType,
 					initialSyncDays: streams.initialSyncDays,
+					initialSyncDaysFuture: streams.initialSyncDaysFuture,
 					settings: streams.settings,
 					lastSyncAt: streams.lastSyncAt,
 					lastSyncStatus: streams.lastSyncStatus,
@@ -59,7 +60,7 @@ export const GET: RequestHandler = async ({ url }) => {
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
-		const { sourceName, sourceId, streamConfigs: streamSettings } = body;
+		const { sourceName, sourceId, streamConfigs: streamSettings, instanceName, description } = body;
 
 		// Validate required fields
 		if (!sourceName) {
@@ -121,6 +122,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						syncSchedule: streamSetting.syncSchedule || streamConfig.cronSchedule,
 						initialSyncType: streamSetting.initialSyncType || 'limited',
 						initialSyncDays: streamSetting.initialSyncDays || 90,
+						initialSyncDaysFuture: streamSetting.initialSyncDaysFuture || 30,
 						settings: streamSetting.settings || {},
 					})
 					.returning();
@@ -129,19 +131,30 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		}
 
-		// Update the source to mark it as active
+		// Update the source to mark it as active and update name/description if provided
+		const updateData: any = {
+			status: 'active',  // Set status to active when streams are configured
+			isActive: true,
+			updatedAt: new Date(),
+			// Still store a summary in metadata for backward compatibility
+			sourceMetadata: {
+				...(await db.select().from(sources).where(eq(sources.id, targetSourceId)).limit(1))[0].sourceMetadata as any || {},
+				configuredAt: new Date().toISOString(),
+				enabledStreams: createdStreams.length
+			}
+		};
+
+		// Update instanceName and description if provided
+		if (instanceName) {
+			updateData.instanceName = instanceName;
+		}
+		if (description) {
+			updateData.description = description;
+		}
+
 		await db
 			.update(sources)
-			.set({
-				isActive: true,
-				updatedAt: new Date(),
-				// Still store a summary in metadata for backward compatibility
-				sourceMetadata: {
-					...(await db.select().from(sources).where(eq(sources.id, targetSourceId)).limit(1))[0].sourceMetadata as any || {},
-					configuredAt: new Date().toISOString(),
-					enabledStreams: createdStreams.length
-				}
-			})
+			.set(updateData)
 			.where(eq(sources.id, targetSourceId));
 
 		// Log for debugging

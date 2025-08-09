@@ -30,20 +30,6 @@ PROCESSING_PORT ?= 8001
 
 # === DEVELOPMENT COMMANDS ===
 
-# Check if .env exists
-env-check:
-	@test -f .env || (echo "❌ Missing .env file. Run 'make env-setup' to create one." && exit 1)
-
-# Create .env from example
-env-setup:
-	@if [ -f .env ]; then \
-		echo "✅ .env already exists"; \
-	else \
-		cp .env.example .env; \
-		echo "📝 Created .env from .env.example"; \
-		echo "⚠️  Please edit .env with your actual values"; \
-	fi
-
 # Start development environment with all services
 dev: env-check
 	@echo "🚀 Starting Jaces in development mode..."
@@ -105,20 +91,32 @@ db-seed:
 	(cd apps/web && DATABASE_URL="$(DB_URL)" pnpm db:seed)
 	@$(MAKE) minio-seed
 
-# Quick database reset - drop schema and reseed
+# Quick database reset - drop and recreate database
 db-reset:
-	@echo "🔄 Quick database reset..."
+	@echo "🔄 Database reset - drop and recreate..."
 	@echo "⚠️  WARNING: This will delete all database data!"
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		echo "🗑️  Resetting database schema..."; \
+		echo "🔌 Terminating database connections..."; \
+		docker-compose exec postgres psql -U $(DB_USER) -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$(DB_NAME)' AND pid <> pg_backend_pid();"; \
+		echo "🗑️  Dropping database..."; \
+		docker-compose exec postgres psql -U $(DB_USER) -d postgres -c "DROP DATABASE IF EXISTS $(DB_NAME);"; \
+		echo "🏗️  Creating fresh database..."; \
+		docker-compose exec postgres psql -U $(DB_USER) -d postgres -c "CREATE DATABASE $(DB_NAME);"; \
+		echo "🔧 Installing database extensions..."; \
+		docker-compose exec -T postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/init-db.sql; \
+		echo "📝 Pushing schema to fresh database..."; \
 		(cd apps/web && DATABASE_URL="$(DB_URL)" npx drizzle-kit push --force); \
 		echo "🌱 Seeding database..."; \
 		(cd apps/web && DATABASE_URL="$(DB_URL)" pnpm db:seed); \
-		echo "🔨 Rebuilding web container to reload schema..."; \
-		docker-compose build web && docker-compose up -d web; \
-		echo "✅ Database reset complete!"; \
+		echo "🐍 Generating Python models..."; \
+		(cd apps/web && pnpm run db:python || echo "⚠️  Python model generation skipped (python not found)"); \
+		echo "🪣 Clearing MinIO bucket..."; \
+		docker-compose exec -T minio mc alias set local http://localhost:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin} &>/dev/null || true; \
+		docker-compose exec -T minio mc rm --recursive --force local/jaces &>/dev/null 2>&1 || true; \
+		docker-compose exec -T minio mc mb local/jaces --ignore-existing &>/dev/null || true; \
+		echo "✅ Database and MinIO reset complete!"; \
 	else \
 		echo "❌ Reset cancelled."; \
 	fi

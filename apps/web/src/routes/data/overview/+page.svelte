@@ -216,33 +216,104 @@
             </div>
 
             <!-- Stats -->
-            <div class="grid grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 gap-4">
                 <div class="text-center">
                     <div class="text-2xl font-mono text-neutral-900">
-                        {data.diagramData?.stats?.totalSources || 0}
+                        {data.diagramData?.stats?.activeSources || 0}
                     </div>
-                    <div class="text-sm text-neutral-600">Sources</div>
+                    <div class="text-sm text-neutral-600">Active Sources</div>
                 </div>
                 <div class="text-center">
                     <div class="text-2xl font-mono text-neutral-900">
-                        {data.diagramData?.stats?.totalStreams || 0}
+                        {data.diagramData?.stats?.activeStreams || 0}
                     </div>
-                    <div class="text-sm text-neutral-600">Streams</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-mono text-neutral-900">
-                        {data.diagramData?.stats?.totalSignals || 0}
-                    </div>
-                    <div class="text-sm text-neutral-600">Signals</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-mono text-neutral-900">
-                        {data.diagramData?.stats?.totalSemantics || 0}
-                    </div>
-                    <div class="text-sm text-neutral-600">Semantics</div>
+                    <div class="text-sm text-neutral-600">Active Streams</div>
                 </div>
             </div>
         </div>
+
+        <!-- Active Sources Table -->
+        {#if data.diagramData?.activeSources && data.diagramData?.activeSources?.length > 0}
+            <div class="mb-8 bg-white rounded-lg border border-neutral-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-neutral-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-mono text-neutral-900">
+                                Active Sources
+                            </h2>
+                            <p class="text-sm text-neutral-600 mt-1">
+                                Currently connected and authenticated data sources
+                            </p>
+                        </div>
+                        <div class="text-sm text-neutral-600">
+                            {data.diagramData.activeSources.length} source{data.diagramData.activeSources.length !== 1 ? 's' : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-neutral-100">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-mono font-medium text-neutral-500 uppercase tracking-wider">
+                                    Source
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-mono font-medium text-neutral-500 uppercase tracking-wider">
+                                    Type
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-mono font-medium text-neutral-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-mono font-medium text-neutral-500 uppercase tracking-wider">
+                                    Last Sync
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-mono font-medium text-neutral-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-neutral-200">
+                            {#each data.diagramData.activeSources as source}
+                                <tr class="hover:bg-neutral-50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div>
+                                            <div class="text-sm font-mono text-neutral-900">
+                                                {source.instanceName}
+                                            </div>
+                                            <div class="text-xs text-neutral-500">
+                                                {source.description || source.sourceName}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-neutral-600">
+                                            {source.sourceName}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <Badge variant={getStatusVariant(source.status)} size="sm">
+                                            {source.status}
+                                        </Badge>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-neutral-600">
+                                            {source.lastSyncAt ? formatRelativeTime(new Date(source.lastSyncAt), currentTime) : 'Never'}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <a 
+                                            href="/data/sources/{source.id}" 
+                                            class="text-sm text-blue-600 hover:text-blue-800 font-mono"
+                                        >
+                                            View →
+                                        </a>
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {/if}
 
         <!-- Connected Streams Table -->
         {#if connectedStreamsWithTiming && connectedStreamsWithTiming.length > 0}

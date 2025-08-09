@@ -7,7 +7,10 @@ import { users } from './users';
 export const activityTypeEnum = pgEnum('activity_type', [
   'ingestion',
   'signal_creation',
-  'transition_detection'
+  'transition_detection',
+  'token_refresh',
+  'scheduled_check',
+  'cleanup'
 ]);
 
 // Create enum for activity status
@@ -64,5 +67,5 @@ export const pipelineActivities = pgTable('pipeline_activities', {
 // Type exports
 export type PipelineActivity = typeof pipelineActivities.$inferSelect;
 export type NewPipelineActivity = typeof pipelineActivities.$inferInsert;
-export type ActivityType = 'ingestion' | 'signal_creation' | 'transition_detection';
+export type ActivityType = 'ingestion' | 'signal_creation' | 'transition_detection' | 'token_refresh' | 'scheduled_check' | 'cleanup';
 export type ActivityStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';

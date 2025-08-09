@@ -48,7 +48,11 @@ class GoogleCalendarStreamProcessor:
         signals_created = 0
         
         # Process each calendar event
-        for event in events:
+        for event_wrapper in events:
+            # Extract the actual event from the wrapper
+            calendar_info = event_wrapper.get('calendar', {})
+            event = event_wrapper.get('event', {})
+            
             # Skip declined events
             if event.get('status') == 'declined':
                 continue
@@ -60,23 +64,23 @@ class GoogleCalendarStreamProcessor:
             if not start_time or not end_time:
                 continue
             
-            # Generate deterministic source event ID (calendar is parallel type)
+            # Create summary first
+            summary = event.get('summary', 'Untitled Event')
+            
+            # Generate deterministic source event ID (calendar events allow multiple at same time)
             # Include the Google event ID for consistent deduplication
             event_data = {
                 'event_id': event.get('id'),
                 'summary': summary
             }
-            source_event_id = generate_source_event_id('parallel', start_time, event_data)
-            
-            # Create summary
-            summary = event.get('summary', 'Untitled Event')
+            source_event_id = generate_source_event_id('multiple', start_time, event_data)
             if event.get('is_all_day'):
                 summary = f"[All Day] {summary}"
             
             # Build metadata
             metadata = {
-                'calendar_id': event.get('calendar_id'),
-                'calendar_name': event.get('calendar_name'),
+                'calendar_id': calendar_info.get('id'),
+                'calendar_name': calendar_info.get('summary'),
                 'event_type': event.get('event_type', 'default'),
                 'location': event.get('location'),
                 'description': event.get('description'),

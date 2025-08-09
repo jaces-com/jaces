@@ -37,7 +37,12 @@ export const load: PageServerLoad = async () => {
 				(b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
 			)[0];
 			
+			// Check if OAuth needs reauth
+			const needsReauth = latestInstance?.oauthExpiresAt && 
+				new Date(latestInstance.oauthExpiresAt) < new Date();
+
 			return {
+				id: latestInstance?.id, // Add the source instance ID for navigation
 				name: sourceConfig.name,
 				display_name: sourceConfig.displayName || sourceConfig.name,
 				description: sourceConfig.description || "",
@@ -52,7 +57,7 @@ export const load: PageServerLoad = async () => {
 				last_seen: latestInstance?.lastSyncAt,
 				oauth_expires_at: latestInstance?.oauthExpiresAt,
 				scopes: latestInstance?.scopes,
-				is_active: latestInstance?.isActive ?? false,
+				status: needsReauth ? 'needs_reauth' : (latestInstance?.status || null),
 				fidelity_options: [],
 				insider_tip_prompt: "",
 				wizard: {},

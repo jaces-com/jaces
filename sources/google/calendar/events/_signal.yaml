@@ -17,7 +17,7 @@ unit:
 computation:
   algorithm: pelt
   cost_function: l1
-  value_type: categorical  # Events are discrete occurrences
+  analysis_type: categorical  # Events are discrete occurrences
   min_segment_size: 5
   penalty_multiplier: 1.2
   gap_threshold_seconds: 3600  # 1 hour

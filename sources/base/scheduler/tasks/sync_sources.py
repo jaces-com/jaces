@@ -13,10 +13,10 @@ from uuid import uuid4
 from celery import Task
 from sqlalchemy import text, select, update
 from sqlalchemy.orm import sessionmaker
-from croniter import croniter
 
 from sources.base.scheduler.celery_app import app
 from sources.base.storage.database import sync_engine, SyncSessionLocal as Session
+from .token_refresh import create_token_refresher
 
 
 def json_serializable(obj):
@@ -82,12 +82,15 @@ def sync_stream(self, stream_id: str, manual: bool = False):
     # Use sync database session
     db = Session()
     try:
-        # Get stream details
+        # Get stream details with instance configuration
         result = db.execute(
             text("""
-                SELECT stc.*, src.company, src.platform, src.auth_type
+                SELECT stc.*, src.company, src.platform, src.auth_type,
+                       s.id as stream_instance_id, s.initial_sync_type, s.initial_sync_days, s.initial_sync_days_future,
+                       s.sync_schedule as instance_sync_schedule, s.settings as instance_settings, s.sync_cursor
                 FROM stream_configs stc 
                 JOIN source_configs src ON stc.source_name = src.name
+                LEFT JOIN streams s ON s.stream_config_id = stc.id
                 WHERE stc.id = :stream_id
             """),
             {"stream_id": stream_id}
@@ -152,7 +155,7 @@ def sync_stream(self, stream_id: str, manual: bool = False):
                         FROM sources
                         WHERE source_name = :source_name
                         AND oauth_access_token IS NOT NULL
-                        AND is_active = true
+                        AND status = 'active'
                         LIMIT 1
                     """),
                     {
@@ -210,6 +213,25 @@ def sync_stream(self, stream_id: str, manual: bool = False):
                     "updated_at": datetime.utcnow()
                 }
             )
+            
+            # Update sync cursor if provided and stream instance exists
+            if stats.get("next_sync_token") and stream.get("stream_instance_id"):
+                db.execute(
+                    text("""
+                        UPDATE streams 
+                        SET sync_cursor = :sync_cursor,
+                            last_sync_at = :last_sync_at,
+                            last_sync_status = 'success',
+                            updated_at = :updated_at
+                        WHERE id = :id
+                    """),
+                    {
+                        "id": stream["stream_instance_id"],
+                        "sync_cursor": stats["next_sync_token"],
+                        "last_sync_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                )
 
             # Update ingestion run
             db.execute(
@@ -601,6 +623,16 @@ class StreamWrapper:
     def last_successful_ingestion_at(self):
         # For streams, we use last_ingestion_at
         return self._dict.get('last_ingestion_at')
+    
+    @property
+    def sync_cursor(self):
+        # Return the sync cursor for incremental syncs
+        return self._dict.get('sync_cursor')
+    
+    @property
+    def sync_token(self):
+        # Alias for compatibility with Google Calendar
+        return self.sync_cursor
 
     @property
     def is_active(self):
@@ -608,196 +640,33 @@ class StreamWrapper:
 
     @property
     def settings(self):
-        return self._dict.get('settings', {})
-
-
-def create_token_refresher(source_name: str, oauth_credentials: dict, source_config: dict, db):
-    """Create a token refresher function for OAuth sources."""
+        # Merge instance settings with config settings
+        config_settings = self._dict.get('settings', {})
+        instance_settings = self._dict.get('instance_settings', {})
+        return {**config_settings, **instance_settings}
     
-    try:
-        from sources._generated_registry import SOURCES
-    except ImportError:
-        logger.warning("Generated registry not found. Token refresh disabled.")
-        return None
+    @property
+    def initial_sync_type(self):
+        # Use instance value if available, otherwise fall back to default
+        return self._dict.get('initial_sync_type', 'limited')
     
-    # Get source config from registry
-    source = SOURCES.get(source_name)
-    if not source:
-        logger.warning(f"Source '{source_name}' not found in registry")
-        return None
+    @property
+    def initial_sync_days(self):
+        # Use instance value if available, otherwise fall back to default
+        return self._dict.get('initial_sync_days', 90)
     
-    # Check if this is an OAuth source
-    if source.get('auth', {}).get('type') != 'oauth2':
-        return None
+    @property
+    def initial_sync_days_future(self):
+        # Use instance value if available, otherwise fall back to default
+        return self._dict.get('initial_sync_days_future', 30)
     
-    # Dynamically import the auth module for this source
-    try:
-        # Construct auth module path from source path
-        source_path = source['path'].rstrip('/')
-        auth_module_path = f"sources.{source_path.replace('/', '.')}.auth"
-        
-        try:
-            auth_module = importlib.import_module(auth_module_path)
-        except ImportError:
-            # Some sources might have auth at a different level
-            # Try parent directory
-            parts = source_path.split('/')
-            if len(parts) > 1:
-                parent_path = '/'.join(parts[:-1])
-                auth_module_path = f"sources.{parent_path.replace('/', '.')}.auth"
-                auth_module = importlib.import_module(auth_module_path)
-            else:
-                raise
-        
-        # Check for refresh_token function or refresh_google_token (backward compat)
-        refresh_func = None
-        if hasattr(auth_module, 'refresh_token'):
-            refresh_func = auth_module.refresh_token
-        elif hasattr(auth_module, 'refresh_google_token'):
-            refresh_func = auth_module.refresh_google_token
-        else:
-            logger.warning(f"No token refresh function found in {auth_module_path}")
-            return None
-            
-        async def token_refresher():
-            """Generic token refresher."""
-            try:
-                # Call source-specific refresh logic
-                new_tokens = await refresh_func(oauth_credentials['oauth_refresh_token'])
-                
-                # Update tokens in sources table
-                db.execute(
-                    text("""
-                        UPDATE sources 
-                        SET oauth_access_token = :access_token,
-                            oauth_refresh_token = :refresh_token,
-                            oauth_expires_at = :expires_at,
-                            updated_at = :updated_at
-                        WHERE id = :source_id
-                    """),
-                    {
-                        "source_id": oauth_credentials.get('source_id'),
-                        "access_token": new_tokens["access_token"],
-                        "refresh_token": new_tokens.get("refresh_token", oauth_credentials['oauth_refresh_token']),
-                        "expires_at": datetime.utcnow() + timedelta(seconds=new_tokens.get("expires_in", 3600)),
-                        "updated_at": datetime.utcnow()
-                    }
-                )
-                db.commit()
-                
-                return new_tokens["access_token"]
-            except Exception as e:
-                raise Exception(f"Failed to refresh {source_name} token: {str(e)}")
-        
-        return token_refresher
-        
-    except ImportError as e:
-        # Source doesn't have an auth module - that's okay for non-OAuth sources
-        logger.debug(f"No auth module found for {source_name}: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Error creating token refresher for {source_name}: {e}")
-        return None
+    @property
+    def sync_schedule(self):
+        # Use instance schedule if available, otherwise config schedule
+        return self._dict.get('instance_sync_schedule') or self._dict.get('sync_schedule')
 
 
-@app.task(name="check_scheduled_syncs")
-def check_scheduled_syncs():
-    """Check for streams that need to be synced based on their schedule."""
 
-    db = Session()
-    try:
-        # Get all active streams with cron schedules from cloud sources only
-        # Device sources (mac, ios) push their own data
-        result = db.execute(
-            text("""
-                SELECT stc.*, src.platform, src.auth_type
-                FROM stream_configs stc
-                JOIN source_configs src ON stc.source_name = src.name
-                WHERE stc.status = 'active'
-                AND stc.ingestion_type = 'pull'
-                AND stc.cron_schedule IS NOT NULL
-                AND src.platform = 'cloud'
-            """)
-        ).fetchall()
-
-        triggered = []
-        now = datetime.utcnow()
-
-        for row in result:
-            stream = dict(row._mapping)
-
-            # Check if there's a connected source for this stream
-            source_result = db.execute(
-                text("""
-                    SELECT id, is_active, oauth_access_token IS NOT NULL as has_token
-                    FROM sources
-                    WHERE source_name = :source_name
-                    AND is_active = true
-                    LIMIT 1
-                """),
-                {"source_name": stream['source_name']}
-            ).first()
-
-            if not source_result:
-                logger.info(
-                    f"No active source found for stream {stream['stream_name']}")
-                continue
-
-            if stream.get('auth_type') == 'oauth2' and not source_result.has_token:
-                logger.info(
-                    f"OAuth source {stream['source_name']} not authenticated")
-                continue
-
-            # Check if sync is due based on cron schedule
-            if should_sync(stream, now):
-                # Trigger sync for this stream
-                sync_stream.delay(str(stream['id']))
-                triggered.append({
-                    "stream_id": str(stream['id']),
-                    "stream_name": stream['stream_name'],
-                    "source": stream['source_name']
-                })
-
-        return {
-            "checked": len(result),
-            "triggered": len(triggered),
-            "streams": triggered
-        }
-    finally:
-        db.close()
-
-
-def should_sync(stream: dict, now: datetime) -> bool:
-    """Check if a stream should sync based on its schedule."""
-    cron_schedule = stream.get('cron_schedule')
-    if not cron_schedule:
-        return False
-
-    # Parse cron expression
-    try:
-        # Use last_ingestion_at for streams
-        last_sync = stream.get('last_ingestion_at')
-        if last_sync is None:
-            # If never synced, sync now
-            return True
-
-        # Ensure both datetimes are timezone-aware or both are naive
-        if last_sync.tzinfo is None:
-            # If last_sync is naive, assume it's UTC
-            from datetime import timezone
-            last_sync = last_sync.replace(tzinfo=timezone.utc)
-        if now.tzinfo is None:
-            # If now is naive, assume it's UTC
-            from datetime import timezone
-            now = now.replace(tzinfo=timezone.utc)
-
-        cron = croniter(cron_schedule, last_sync)
-        next_run = cron.get_next(datetime)
-        return next_run <= now
-    except Exception as e:
-        logger.error(
-            f"Invalid cron expression '{cron_schedule}' for stream {stream.get('stream_name')}: {e}")
-        return False
 
 
 # Note: sync_all_user_sources is deprecated - the system no longer uses user_id
@@ -833,88 +702,5 @@ def should_sync(stream: dict, now: datetime) -> bool:
 #         db.close()
 
 
-@app.task(name="cleanup_old_runs")
-def cleanup_old_runs(days_to_keep: int = 30):
-    """Clean up old ingestion runs to prevent table bloat."""
-
-    db = Session()
-    try:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
-
-        # Delete old runs
-        result = db.execute(
-            text("""
-                DELETE FROM pipeline_activities 
-                WHERE activity_type = 'ingestion' 
-                AND started_at < :cutoff_date
-                RETURNING id
-            """),
-            {"cutoff_date": cutoff_date}
-        )
-
-        deleted_count = result.rowcount
-        db.commit()
-
-        return {
-            "deleted": deleted_count,
-            "cutoff_date": cutoff_date.isoformat()
-        }
-    finally:
-        db.close()
 
 
-@app.task(name="refresh_expiring_tokens")
-def refresh_expiring_tokens():
-    """Proactively refresh tokens that are about to expire."""
-
-    db = Session()
-    try:
-        # Find credentials that expire within the next hour
-        expiry_threshold = datetime.utcnow() + timedelta(hours=1)
-
-        # Find sources with tokens that need refreshing
-        result = db.execute(
-            text("""
-                SELECT s.id, s.source_name, s.instance_name, s.oauth_access_token, 
-                       s.oauth_refresh_token, s.oauth_expires_at, s.scopes
-                FROM sources s
-                WHERE s.oauth_expires_at IS NOT NULL
-                AND s.oauth_expires_at < :expiry_threshold
-                AND s.oauth_refresh_token IS NOT NULL
-                AND s.is_active = true
-            """),
-            {"expiry_threshold": expiry_threshold}
-        ).fetchall()
-
-        refreshed = []
-        failed = []
-
-        for row in result:
-            source_dict = dict(row._mapping)
-            try:
-                # Skip non-OAuth sources (e.g., device sources)
-                if not source_dict.get('oauth_refresh_token'):
-                    continue
-
-                # For now, skip token refresh since the system architecture has changed
-                # This would need to be reimplemented based on the new schema
-                logger.warning(
-                    f"Token refresh needed for source {source_dict['source_name']} "
-                    f"(instance: {source_dict['instance_name']}), but refresh logic needs update"
-                )
-
-            except Exception as e:
-                failed.append({
-                    "source": source_dict['source_name'],
-                    "instance": source_dict.get('instance_name', 'unknown'),
-                    "error": str(e)
-                })
-
-        return {
-            "refreshed": len(refreshed),
-            "failed": len(failed),
-            "refreshed_sources": refreshed,
-            "failed_sources": failed
-        }
-    finally:
-        db.close()

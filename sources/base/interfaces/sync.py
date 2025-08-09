@@ -1,83 +1,182 @@
 """Abstract base class for all source syncs."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, List
-from datetime import datetime
+from typing import Any, Dict, Optional, List, Tuple
+from datetime import datetime, timedelta, timezone
 
 
 class BaseSync(ABC):
     """
-    Abstract base class for all source sync implementations.
+    Enhanced abstract base class for all source sync implementations.
     
-    Each source must implement this interface to handle data fetching
-    and synchronization with the platform.
+    Provides common functionality for initial vs incremental sync detection,
+    date range calculation based on configuration, and standardized sync flow.
     """
     
-    def __init__(self, source_id: str, config: Dict[str, Any]):
+    def __init__(self, stream, access_token: Optional[str] = None, token_refresher=None):
         """
         Initialize the sync handler.
         
         Args:
-            source_id: Unique identifier for the source instance
-            config: Source-specific configuration from database
+            stream: Stream wrapper object with configuration
+            access_token: Optional OAuth access token
+            token_refresher: Optional token refresh callback
         """
-        self.source_id = source_id
-        self.config = config
+        self.stream = stream
+        self.access_token = access_token
+        self.token_refresher = token_refresher
     
-    @abstractmethod
-    async def authenticate(self) -> bool:
+    def is_initial_sync(self) -> bool:
         """
-        Authenticate with the source.
+        Determine if this is an initial sync.
         
         Returns:
-            True if authentication successful, False otherwise
+            True if no previous successful sync exists
+        """
+        return (
+            not hasattr(self.stream, 'last_successful_ingestion_at') or 
+            self.stream.last_successful_ingestion_at is None
+        )
+    
+    def get_sync_date_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """
+        Calculate date range based on sync type and configuration.
+        
+        For initial syncs:
+        - 'full': Uses source-specific full range (defined in subclass)
+        - 'limited': Uses configured days from database
+        
+        For incremental syncs:
+        - Uses source-specific incremental logic (sync tokens, last sync time, etc.)
+        
+        Returns:
+            Tuple of (start_date, end_date), either can be None for token-based syncs
+        """
+        now = datetime.now(timezone.utc)
+        
+        if self.is_initial_sync():
+            sync_type = getattr(self.stream, 'initial_sync_type', 'limited')
+            
+            if sync_type == 'full':
+                # Use source-specific full sync range
+                return self.get_full_sync_range()
+            else:  # 'limited'
+                # Use configured days from database
+                days_past = getattr(self.stream, 'initial_sync_days', 90)
+                days_future = getattr(self.stream, 'initial_sync_days_future', 30)
+                
+                print(f"Initial limited sync: {days_past} days past, {days_future} days future")
+                
+                return (
+                    now - timedelta(days=days_past),
+                    now + timedelta(days=days_future)
+                )
+        else:
+            # Incremental sync
+            return self.get_incremental_sync_range()
+    
+    @abstractmethod
+    def get_full_sync_range(self) -> Tuple[datetime, datetime]:
+        """
+        Define the date range for a full initial sync.
+        
+        Each source should define what "full" means for their data.
+        
+        Returns:
+            Tuple of (start_date, end_date) for full sync
         """
         pass
     
     @abstractmethod
-    async def sync(
-        self, 
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None
-    ) -> Dict[str, Any]:
+    def get_incremental_sync_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
         """
-        Perform a sync operation.
+        Define the date range for incremental syncs.
+        
+        Can return (None, None) if using sync tokens instead of date ranges.
+        
+        Returns:
+            Tuple of (start_date, end_date) for incremental sync
+        """
+        pass
+    
+    @abstractmethod
+    async def fetch_data(self, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict[str, Any]:
+        """
+        Fetch data for the given date range.
+        
+        If dates are None, implementation should use alternative methods (e.g., sync tokens).
         
         Args:
-            since: Optional start time for incremental sync
-            until: Optional end time for sync window
+            start_date: Start of date range (can be None for token-based syncs)
+            end_date: End of date range (can be None for token-based syncs)
             
         Returns:
-            Dict containing sync results and metadata
+            Dict containing fetched data and sync statistics
         """
         pass
     
-    @abstractmethod
+    async def run(self) -> Dict[str, Any]:
+        """
+        Main sync execution flow.
+        
+        Handles initial vs incremental detection, date range calculation,
+        and calls the source-specific fetch_data method.
+        
+        Returns:
+            Dict containing sync results and statistics
+        """
+        stats = {
+            "started_at": datetime.utcnow().isoformat(),
+            "is_initial_sync": self.is_initial_sync(),
+            "sync_type": getattr(self.stream, 'initial_sync_type', 'limited') if self.is_initial_sync() else 'incremental'
+        }
+        
+        try:
+            # Calculate date range based on sync type
+            start_date, end_date = self.get_sync_date_range()
+            
+            # Log sync type and range
+            if self.is_initial_sync():
+                print(f"Performing initial {stats['sync_type']} sync")
+                if start_date and end_date:
+                    print(f"Date range: {start_date.isoformat()} to {end_date.isoformat()}")
+            else:
+                print(f"Performing incremental sync")
+                if start_date and end_date:
+                    print(f"Date range: {start_date.isoformat() if start_date else 'last sync'} to {end_date.isoformat()}")
+                elif not start_date and not end_date:
+                    print("Using sync token for incremental sync")
+            
+            # Fetch data using source-specific implementation
+            result = await self.fetch_data(start_date, end_date)
+            
+            # Update stats with results
+            stats.update(result)
+            stats["status"] = "success"
+            stats["completed_at"] = datetime.utcnow().isoformat()
+            
+        except Exception as e:
+            stats["status"] = "error"
+            stats["error"] = str(e)
+            stats["completed_at"] = datetime.utcnow().isoformat()
+            raise
+        
+        return stats
+    
+    # Legacy methods for backward compatibility (can be removed later)
+    
+    async def authenticate(self) -> bool:
+        """Legacy: Authentication is now handled in __init__."""
+        return self.access_token is not None
+    
     async def test_connection(self) -> bool:
-        """
-        Test the connection to the source.
-        
-        Returns:
-            True if connection successful, False otherwise
-        """
-        pass
+        """Legacy: Test connection to the source."""
+        return True
     
-    @abstractmethod
     def get_sync_schedule(self) -> Optional[str]:
-        """
-        Get the cron schedule for this sync.
-        
-        Returns:
-            Cron schedule string or None for push-based sources
-        """
-        pass
+        """Legacy: Get cron schedule from stream config."""
+        return getattr(self.stream, 'sync_schedule', None)
     
-    @abstractmethod
     def get_required_config_fields(self) -> List[str]:
-        """
-        Get list of required configuration fields.
-        
-        Returns:
-            List of field names required for this sync
-        """
-        pass
+        """Legacy: Get required configuration fields."""
+        return []

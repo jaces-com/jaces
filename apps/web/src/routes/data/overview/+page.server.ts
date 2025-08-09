@@ -86,7 +86,7 @@ export const load: PageServerLoad = async () => {
 				// Source data
 				sourceName: sources.sourceName,
 				sourceInstanceName: sources.instanceName,
-				sourceIsActive: sources.isActive,
+				sourceStatus: sources.status,
 				// Source config data
 				sourceDisplayName: sourceConfigs.displayName,
 				sourceCompany: sourceConfigs.company,
@@ -98,8 +98,8 @@ export const load: PageServerLoad = async () => {
 			.innerJoin(sourceConfigs, eq(sources.sourceName, sourceConfigs.name))
 			.where(
 				and(
-					eq(sources.isActive, true),  // Only active sources
-					eq(streams.enabled, true)    // Only enabled streams
+					eq(sources.status, 'active'),  // Only active sources
+					eq(streams.enabled, true)      // Only enabled streams
 				)
 			)
 			.orderBy(desc(streams.lastSyncAt));
@@ -149,7 +149,7 @@ export const load: PageServerLoad = async () => {
 					company: sourceConfig.company,
 					platform: sourceConfig.platform,
 					deviceType: sourceConfig.deviceType,
-					isActive: instances.length > 0 && instances.some(i => i.isActive),
+					isActive: instances.length > 0 && instances.some(i => i.status === 'active'),
 					icon: getSourceIcon(sourceConfig.name),
 				};
 			});
@@ -187,6 +187,11 @@ export const load: PageServerLoad = async () => {
 			semanticsByStream.get(semantic.streamName)!.push(semantic);
 		}
 
+		// Get active sources directly (not just those with streams)
+		const activeSources = connectedSources.filter(source => 
+			source.status === 'active'
+		);
+
 		// Build the node diagram data structure
 		const diagramData = {
 			sources: processedSources || [],
@@ -194,19 +199,21 @@ export const load: PageServerLoad = async () => {
 			signals: allSignals || [],
 			semantics: allSemantics || [],
 			connectedStreams: connectedStreamInstances || [],
+			activeSources: activeSources || [],
 			signalsBySource: Object.fromEntries(signalsBySource || []),
 			streamsBySource: Object.fromEntries(streamsBySource || []),
 			signalsByStream: Object.fromEntries(signalsByStream || []),
 			semanticsByStream: Object.fromEntries(semanticsByStream || []),
 			stats: {
-				totalSources: processedSources?.length || 0,
-				totalStreams: processedStreams?.length || 0,
-				totalSignals: allSignals?.length || 0,
-				totalSemantics: allSemantics?.length || 0,
+				totalSources: activeSources?.length || 0,  // Count of actual connected sources
+				totalStreams: connectedStreamInstances?.length || 0,  // Count of actual enabled streams
+				totalSignals: allSignals?.length || 0,  // Signal types available
+				totalSemantics: allSemantics?.length || 0,  // Semantic types available
 				connectedStreams: connectedStreamInstances?.length || 0,
-				activeSignals: allSignals?.filter(s => s.status === 'active')?.length || 0,
-				activeStreams: processedStreams?.filter(s => s.isEnabled)?.length || 0,
-				activeSemantics: allSemantics?.filter(s => s.status === 'active')?.length || 0,
+				activeSources: activeSources?.length || 0,  // Active source instances
+				activeSignals: allSignals?.length || 0,  // Available signal types
+				activeStreams: connectedStreamInstances?.length || 0,  // Active stream instances
+				activeSemantics: allSemantics?.length || 0,  // Available semantic types
 				signalsByValueType: {
 					continuous: allSignals?.filter(s => s.computation?.value_type === 'continuous')?.length || 0,
 					spatial: allSignals?.filter(s => s.computation?.value_type === 'spatial')?.length || 0,

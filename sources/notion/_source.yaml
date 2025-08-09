@@ -44,6 +44,3 @@ api:
 # Sync settings
 sync:
   type: pull
-  default_lookback_days: 90
-  supports_incremental: true
-  supports_cursor: true

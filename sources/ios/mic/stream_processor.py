@@ -151,13 +151,13 @@ class MicAudioStreamProcessor:
             # Audio data is already stored in MinIO by the ingestion endpoint
             # Here we just create a reference record for tracking
             
-            # Generate deterministic source event ID (voice transcription is parallel type)
+            # Generate deterministic source event ID (voice transcriptions allow multiple at same time)
             # Using the original chunk ID to ensure consistency
             chunk_data = {
                 'id': original_chunk_id,
                 'duration': duration
             }
-            source_event_id = generate_source_event_id('parallel', timestamp_start, chunk_data)
+            source_event_id = generate_source_event_id('multiple', timestamp_start, chunk_data)
             
             # Create metadata for the audio chunk
             chunk_metadata = {
@@ -206,8 +206,8 @@ class MicAudioStreamProcessor:
                     # Calculate audio level from the chunk
                     audio_level_db = self.calculate_audio_level(chunk.get('audio_data', ''))
                     
-                    # Generate source event ID for audio level (continuous type, uses timestamp only)
-                    audio_level_event_id = generate_source_event_id('continuous', timestamp_start, {})
+                    # Generate source event ID for audio level (single value per timestamp)
+                    audio_level_event_id = generate_source_event_id('single', timestamp_start, {})
                     
                     # Create audio level signal
                     db.execute(

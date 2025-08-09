@@ -43,6 +43,4 @@ api:
 # Sync settings
 sync:
   type: pull
-  default_lookback_days: 90
-  default_lookahead_days: 360
   page_size: 100

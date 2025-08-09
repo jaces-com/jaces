@@ -18,9 +18,9 @@
 		"db:migrate": "tsx scripts/migrate.ts",
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
-		"db:python": "tsx scripts/drizzle-to-python.ts && cd ../.. && python scripts/generate_registry.py",
+		"db:python": "tsx scripts/drizzle-to-python.ts && cd ../.. && (python3 scripts/generate_registry.py || python scripts/generate_registry.py)",
 		"db:seed": "tsx scripts/seed.ts",
-		"registry:generate": "cd ../.. && python scripts/generate_registry.py"
+		"registry:generate": "cd ../.. && (python3 scripts/generate_registry.py || python scripts/generate_registry.py)"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.5.0",

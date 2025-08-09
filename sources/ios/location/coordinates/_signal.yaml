@@ -18,7 +18,7 @@ computation:
   algorithm: pelt
   cost_function: l2
   distance_metric: haversine  # For geographic coordinates
-  value_type: continuous
+  analysis_type: continuous
   min_segment_size: 10
   penalty_multiplier: 1.5
   gap_threshold_seconds: 1200  # 20 minutes

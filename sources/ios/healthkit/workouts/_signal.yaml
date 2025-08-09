@@ -12,7 +12,7 @@ unit:
 
 computation:
   algorithm: event_detection
-  value_type: categorical
+  analysis_type: categorical
   categories:
     - running
     - walking

@@ -12,10 +12,6 @@ ingestion:
   batch_type: events
   raw_data_type: CalendarEvent
   
-# Signals produced by this stream
-signals:
-  - calendar  # Event-based categorical signal
-
 # API configuration
 api:
   endpoint: https://www.googleapis.com/calendar/v3
@@ -26,20 +22,10 @@ api:
 # Sync configuration
 sync:
   schedule: "*/15 * * * *"  # Every 15 minutes
-  lookback_days: 90
-  lookahead_days: 360
-  calendars:
-    - primary
-    - work
-    - personal
-  exclude_patterns:
-    - "Busy"
-    - "Out of Office"
+  type: token  # Uses sync tokens exclusively (no date ranges)
     
 # Processing configuration
 processing:
-  deduplication: 
-    strategy: content_hash  # Multiple events can have same timestamp
   normalization: true
   validation:
     required_fields:
@@ -47,9 +33,3 @@ processing:
       - summary
       - start
       - end
-      
-# Storage settings
-storage:
-  retention_days: 400  # Keep past events + future
-  compression: gzip
-  format: json

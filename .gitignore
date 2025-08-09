@@ -58,6 +58,9 @@ __pycache__/
 .Python
 build/
 apps/mac/build/
+
+# Git backups
+.git-backup-*/
 develop-eggs/
 dist/
 downloads/
