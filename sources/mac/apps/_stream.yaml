@@ -19,7 +19,7 @@ signals:
 # Processing configuration
 processing:
   deduplication:
-    strategy: timestamp  # App events should be unique by timestamp
+    strategy: single  # App events should be unique by timestamp
   normalization: true
   validation:
     required_fields:

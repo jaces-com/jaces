@@ -26,7 +26,7 @@ PROCESSING_PORT ?= 8001
 .PHONY: help dev stop logs ps rebuild clean reset
 .PHONY: db-push db-migrate db-seed db-reset db-python db-studio
 .PHONY: env-check env-setup deploy-init deploy-ec2 deploy-update deploy-logs prod
-.PHONY: mac-install mac-run minio-download minio-download-date minio-process minio-seed
+.PHONY: mac-install mac-run minio-download minio-download-date minio-process
 
 # === DEVELOPMENT COMMANDS ===
 
@@ -88,8 +88,7 @@ db-migrate:
 # Seed database with test data
 db-seed:
 	@echo "🌱 Seeding database with TypeScript seeds..."
-	(cd apps/web && DATABASE_URL="$(DB_URL)" pnpm db:seed)
-	@$(MAKE) minio-seed
+	(cd apps/web && DATABASE_URL="$(DB_URL)" MINIO_ENDPOINT="localhost:9000" pnpm db:seed)
 
 # Quick database reset - drop and recreate database
 db-reset:
@@ -108,15 +107,15 @@ db-reset:
 		docker-compose exec -T postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/init-db.sql; \
 		echo "📝 Pushing schema to fresh database..."; \
 		(cd apps/web && DATABASE_URL="$(DB_URL)" npx drizzle-kit push --force); \
-		echo "🌱 Seeding database..."; \
-		(cd apps/web && DATABASE_URL="$(DB_URL)" pnpm db:seed); \
-		echo "🐍 Generating Python models..."; \
-		(cd apps/web && pnpm run db:python || echo "⚠️  Python model generation skipped (python not found)"); \
 		echo "🪣 Clearing MinIO bucket..."; \
 		docker-compose exec -T minio mc alias set local http://localhost:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin} &>/dev/null || true; \
 		docker-compose exec -T minio mc rm --recursive --force local/jaces &>/dev/null 2>&1 || true; \
 		docker-compose exec -T minio mc mb local/jaces --ignore-existing &>/dev/null || true; \
-		echo "✅ Database and MinIO reset complete!"; \
+		echo "🌱 Seeding database and MinIO..."; \
+		(cd apps/web && DATABASE_URL="$(DB_URL)" MINIO_ENDPOINT="localhost:9000" pnpm db:seed); \
+		echo "🐍 Generating Python models..."; \
+		(cd apps/web && pnpm run db:python || echo "⚠️  Python model generation skipped (python not found)"); \
+		echo "✅ Database reset complete with test data!"; \
 	else \
 		echo "❌ Reset cancelled."; \
 	fi
@@ -211,11 +210,6 @@ minio-process:
 	@docker-compose exec celery-worker uv run python /app/scripts/filter-stream-data.py
 	@echo "✅ Processed data saved to assets/test-data/captured-streams/processed/"
 
-# Seed MinIO with test streams
-minio-seed:
-	@echo "🌊 Seeding MinIO with test streams..."
-	@docker-compose exec celery-worker uv run python /app/scripts/seed-minio-test-data.py
-	@echo "✅ Test streams uploaded and queued for processing"
 
 # === MAINTENANCE COMMANDS ===
 
@@ -254,14 +248,10 @@ reset:
 		rm -rf apps/web/drizzle/meta/*; \
 		echo '{"version":"7","dialect":"postgresql","entries":[]}' > apps/web/drizzle/meta/_journal.json; \
 		(cd apps/web && DATABASE_URL="$(DB_URL)" npx drizzle-kit push --force); \
-		echo "📊 Step 6/8: Seeding database..."; \
+		echo "📊 Step 6/7: Seeding database..."; \
 		(cd apps/web && DATABASE_URL="$(DB_URL)" pnpm db:seed); \
-		echo "📊 Step 7/8: Generating sources registry..."; \
+		echo "📊 Step 7/7: Generating sources registry..."; \
 		$(MAKE) registry; \
-		echo "🌊 Step 8/8: Seeding MinIO and processing streams..."; \
-		$(MAKE) minio-seed; \
-		echo "⏳ Waiting for stream processing to complete..."; \
-		sleep 10; \
 		echo "✅ Development environment reset complete!"; \
 		echo "📋 Services status:"; \
 		docker-compose ps; \
@@ -313,7 +303,6 @@ help:
 	@echo "  make minio-download   - Download today's streams"
 	@echo "  make minio-download-date - Download streams for specific date"
 	@echo "  make minio-process    - Filter captured streams to target dates"
-	@echo "  make minio-seed       - Seed MinIO with test streams"
 	@echo ""
 	@echo "🧹 MAINTENANCE"
 	@echo "  make clean            - Delete all data"

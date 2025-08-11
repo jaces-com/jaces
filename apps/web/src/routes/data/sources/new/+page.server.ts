@@ -23,14 +23,20 @@ export const load: PageServerLoad = async ({ url }) => {
 			throw error(404, `Source '${sourceName}' not found`);
 		}
 		
-		// Check if this source is already connected
-		const [existingSource] = await db
+		// Get all existing instances of this source
+		const existingSources = await db
 			.select()
 			.from(sources)
-			.where(eq(sources.sourceName, sourceName))
-			.limit(1);
+			.where(eq(sources.sourceName, sourceName));
 		
-		const isConnected = !!existingSource;
+		// Check if at least one instance is connected
+		const isConnected = existingSources.length > 0;
+		const connectionCount = existingSources.length;
+		
+		// Get the most recent instance for display purposes
+		const existingSource = existingSources.sort((a, b) => 
+			(b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+		)[0] || null;
 		const connectionSuccessful = url.searchParams.get('connected') === sourceName;
 		
 		// Get all stream configurations for this source
@@ -79,10 +85,13 @@ export const load: PageServerLoad = async ({ url }) => {
 				requiredScopes: oauthConfig.requiredScopes || [],
 				oauthUrl,
 				isConnected,
+				connectionCount,
 				connectionSuccessful,
 				existingSource: existingSource ? {
 					id: existingSource.id,
 					instanceName: existingSource.instanceName,
+					status: existingSource.status,
+					deviceToken: existingSource.deviceToken,
 					isActive: existingSource.isActive,
 					lastSyncAt: existingSource.lastSyncAt
 				} : null,

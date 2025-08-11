@@ -88,7 +88,7 @@ struct StatusCard: View {
     @State private var secondsUntilSync: Int = 0
     
     var statusColor: Color {
-        if !deviceManager.isPaired {
+        if !deviceManager.isConfigured {
             return .red
         } else if uploadCoordinator.isUploading {
             return .blue
@@ -98,7 +98,7 @@ struct StatusCard: View {
     }
     
     var statusText: String {
-        if !deviceManager.isPaired {
+        if !deviceManager.isConfigured {
             return "Not Connected"
         } else if uploadCoordinator.isUploading {
             return "Syncing..."
@@ -125,14 +125,14 @@ struct StatusCard: View {
                 
                 Spacer()
                 
-                if deviceManager.isPaired && !uploadCoordinator.isUploading {
+                if deviceManager.isConfigured && !uploadCoordinator.isUploading {
                     Text(countdownText)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
             
-            if deviceManager.isPaired {
+            if deviceManager.isConfigured {
                 HStack {
                     Label(deviceManager.configuration.deviceName, systemImage: "iphone")
                         .font(.caption)
@@ -157,7 +157,7 @@ struct StatusCard: View {
         .onDisappear {
             countdownTimer?.invalidate()
         }
-        .onChange(of: uploadCoordinator.lastUploadDate) { _ in
+        .onChange(of: uploadCoordinator.lastUploadDate) {
             updateCountdown()
         }
     }

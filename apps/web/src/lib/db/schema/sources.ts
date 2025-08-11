@@ -23,11 +23,6 @@ export const sources = pgTable('sources', {
   deviceId: varchar('device_id'), // Unique device identifier
   deviceToken: text('device_token'), // Authentication token for device
   deviceType: varchar('device_type'), // 'ios', 'mac', etc.
-  pairedDeviceName: varchar('paired_device_name'), // Human-readable device name
-  
-  // Pairing-related fields
-  pairingCode: varchar('pairing_code', { length: 6 }),
-  pairingExpiresAt: timestamp('pairing_expires_at', { withTimezone: true }),
   deviceLastSeen: timestamp('device_last_seen', { withTimezone: true }),
 
   // OAuth-specific fields (for cloud sources)

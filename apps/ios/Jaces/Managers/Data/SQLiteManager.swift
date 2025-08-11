@@ -67,9 +67,8 @@ class SQLiteManager {
             var success = false
             
             if sqlite3_prepare_v2(db, insertSQL, -1, &statement, nil) == SQLITE_OK {
-                _ = streamName.withCString { cString in
-                    sqlite3_bind_text(statement, 1, cString, -1, nil)
-                }
+                // Use NSString for proper memory handling with SQLite
+                sqlite3_bind_text(statement, 1, (streamName as NSString).utf8String, -1, nil)
                 sqlite3_bind_blob(statement, 2, (data as NSData).bytes, Int32(data.count), nil)
                 sqlite3_bind_double(statement, 3, Date().timeIntervalSince1970)
                 
@@ -383,11 +382,11 @@ class SQLiteManager {
                     let count = Int(sqlite3_column_int(statement, 1))
                     
                     switch streamName {
-                    case "apple_ios_healthkit":
+                    case "ios_healthkit":
                         healthkit = count
-                    case "apple_ios_core_location":
+                    case "ios_location":
                         location = count
-                    case "apple_ios_mic_audio":
+                    case "ios_mic":
                         audio = count
                     default:
                         break

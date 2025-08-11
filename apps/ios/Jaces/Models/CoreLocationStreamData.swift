@@ -39,7 +39,7 @@ struct LocationData: Codable {
 }
 
 struct CoreLocationStreamData: Codable {
-    let streamName: String = "apple_ios_core_location"
+    let streamName: String = "ios_location"
     let deviceId: String
     let data: [LocationData]
     let batchMetadata: BatchMetadata

@@ -4,38 +4,32 @@ A native iOS application for continuous data collection including location, heal
 
 ## Setup
 
-### 1. Configuration
-
-Copy the example environment file and configure it:
+### 1. Open in Xcode
 
 ```bash
-cp .env.example .env
+cd apps/ios
+open Jaces.xcodeproj
 ```
 
-Edit `.env` and set your Apple Developer Team ID:
-```
-DEVELOPMENT_TEAM=YOUR_TEAM_ID_HERE
-```
+### 2. Configure Signing
+
+1. Select the **Jaces** project in the navigator
+2. Go to **Signing & Capabilities** tab
+3. Select your **Team** from the dropdown menu
+4. Xcode will automatically manage the provisioning profile
 
 You can find your Team ID in:
-- Xcode: Project settings → Signing & Capabilities → Team dropdown
+- Xcode: The Team dropdown will show your available teams
 - Apple Developer Portal: Account → Membership → Team ID
 
-### 2. Xcode Configuration
+### 3. Configure API Endpoint (Optional)
 
-The project uses `Config.xcconfig` for build settings. If you prefer to use Xcode's UI:
+The app defaults to `http://localhost:3000` for the API endpoint. Users can change this during the onboarding flow in the app.
 
-1. Open `Jaces.xcodeproj`
-2. Select the project in the navigator
-3. Go to Signing & Capabilities
-4. Select your team from the dropdown
-
-### 3. API Endpoint
-
-The default API endpoint is `http://localhost:3000`. To change it:
-
-- **For development**: Edit the `DEFAULT_API_ENDPOINT` in your `.env` file
-- **At runtime**: Users can change it in the app's onboarding flow
+If you want to change the default, edit line 28 in `Models/DeviceConfiguration.swift`:
+```swift
+apiEndpoint: String = "http://localhost:3000"
+```
 
 ### 4. Build and Run
 

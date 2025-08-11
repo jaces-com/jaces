@@ -116,35 +116,58 @@ struct JacesApp: App {
         // Start periodic uploads (this now handles all data collection)
         uploadCoordinator.startPeriodicUploads()
         
-        // Start location tracking if authorized
-        if locationManager.hasPermission {
+        let config = deviceManager.configuration
+        
+        print("🚀 Starting services with configuration:")
+        print("   Stream configurations: \(config.streamConfigurations.count) streams")
+        for (key, streamConfig) in config.streamConfigurations {
+            print("     - \(key): enabled=\(streamConfig.enabled), initialSyncDays=\(streamConfig.initialSyncDays)")
+        }
+        
+        // Start location tracking if authorized AND enabled
+        if locationManager.hasPermission && config.isStreamEnabled("location") {
             locationManager.startTracking()
-            print("✅ Started location tracking")
-        }
-        
-        // Start audio recording if authorized
-        if audioManager.hasPermission {
-            audioManager.startRecording()
-            print("✅ Started audio recording")
-        }
-        
-        // Start HealthKit monitoring if authorized
-        if healthKitManager.isAuthorized {
-            healthKitManager.startMonitoring()
-            print("✅ Started HealthKit monitoring")
+            print("✅ Started location tracking (enabled in web app)")
+        } else if locationManager.hasPermission {
+            print("⏸️ Location tracking disabled in web app")
         } else {
-            // Try again after a delay in case authorization is still being checked
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                if healthKitManager.isAuthorized {
-                    healthKitManager.startMonitoring()
-                    print("✅ Started HealthKit monitoring (delayed)")
-                } else {
-                    print("⚠️ HealthKit still not authorized after delay")
-                }
-            }
+            print("❌ Location tracking - no permission")
         }
         
-        print("✅ All services started")
+        // Start audio recording if authorized AND enabled
+        if audioManager.hasPermission && config.isStreamEnabled("mic") {
+            audioManager.startRecording()
+            print("✅ Started audio recording (enabled in web app)")
+        } else if audioManager.hasPermission {
+            print("⏸️ Audio recording disabled in web app")
+        } else {
+            print("❌ Audio recording - no permission")
+        }
+        
+        // Start HealthKit monitoring if authorized AND enabled
+        if healthKitManager.isAuthorized && config.isStreamEnabled("healthkit") {
+            // Check if we have anchors (meaning initial sync was done)
+            let hasAnchors = !healthKitManager.anchors.isEmpty
+            
+            if hasAnchors {
+                // We have anchors, so initial sync was done - start regular monitoring
+                healthKitManager.startMonitoring()
+                print("✅ Started HealthKit monitoring (incremental sync)")
+            } else {
+                // No anchors means initial sync hasn't been done yet
+                // This happens when the app is restarted after onboarding
+                // In this case, onboarding should have set the anchors
+                // If not, we need to do initial sync first
+                print("⚠️ HealthKit initial sync may not have completed properly")
+                print("⚠️ Starting monitoring anyway - will collect all data")
+                healthKitManager.startMonitoring()
+            }
+        } else if healthKitManager.isAuthorized {
+            print("⏸️ HealthKit monitoring disabled in web app")
+        } else {
+            print("❌ HealthKit monitoring - no permission")
+        }
+        
+        print("✅ Service startup complete")
     }
 }

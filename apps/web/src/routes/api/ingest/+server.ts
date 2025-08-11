@@ -22,11 +22,14 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	try {
-		// Find device source instance by token
+		// Normalize token to uppercase for case-insensitive comparison
+		const normalizedToken = deviceToken.toUpperCase();
+		
+		// Find device source instance by token (case-insensitive)
 		const [deviceSource] = await db
 			.select()
 			.from(sources)
-			.where(eq(sources.deviceToken, deviceToken))
+			.where(eq(sources.deviceToken, normalizedToken))
 			.limit(1);
 
 		if (!deviceSource) {
@@ -142,14 +145,12 @@ export const POST: RequestHandler = async ({ request }) => {
 				.where(eq(pipelineActivities.id, pipelineActivity.id));
 
 			// Queue processing task with stream reference
-			// TEMPORARILY DISABLED: Processing/normalization after MinIO storage
-			// const taskId = await queueCeleryTask('process_stream_batch', [
-			// 	streamName,
-			// 	streamKey,
-			// 	pipelineActivity.id,
-			// 	stream.id
-			// ]);
-			const taskId = null; // Placeholder for disabled processing
+			const taskId = await queueCeleryTask('process_stream_batch', [
+				streamName,
+				streamKey,
+				pipelineActivity.id,
+				stream.id
+			])
 
 			return json({
 				success: true,

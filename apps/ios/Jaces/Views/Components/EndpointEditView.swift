@@ -54,7 +54,15 @@ struct EndpointEditView: View {
                 Section(header: Text("New Endpoint")) {
                     VStack(alignment: .leading, spacing: 12) {
                         TextField("https://your-server.com", text: $newEndpoint)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .font(.system(size: 17))
+                            .padding()
+                            .frame(minHeight: 52)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color(.systemGray4), lineWidth: 0.5)
+                            )
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .keyboardType(.URL)

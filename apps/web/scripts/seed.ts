@@ -4,6 +4,12 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
+
+// Make crypto globally available for MinIO
+if (typeof globalThis.crypto === 'undefined') {
+	globalThis.crypto = crypto as any;
+}
 
 // Load environment variables BEFORE importing db client
 const __filename = fileURLToPath(import.meta.url);
@@ -30,8 +36,28 @@ async function seedDatabase() {
   const registryContent = fs.readFileSync(registryPath, 'utf-8');
   const registry = yaml.load(registryContent) as any;
   
-  // No user creation needed for single-user app
-  console.log('ℹ️  Single-user app - skipping user creation');
+  // Create default user for single-user app
+  console.log('👤 Creating default user...');
+  const { users } = await import('../src/lib/db/schema');
+  
+  // Check if user already exists
+  const existingUser = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, 'user@jaces.app'))
+    .limit(1);
+  
+  if (existingUser.length === 0) {
+    await db.insert(users).values({
+      firstName: 'Default',
+      lastName: 'User',
+      email: 'user@jaces.app',
+      timezone: 'America/Chicago'
+    });
+    console.log('  ✅ Created default user');
+  } else {
+    console.log('  ℹ️  Default user already exists');
+  }
 
   // Seed source configs
   for (const [sourceName, sourceData] of Object.entries(registry.sources)) {
@@ -54,33 +80,21 @@ async function seedDatabase() {
         }
       }
       
-      // Map video files based on source name
-      const videoMap: Record<string, string> = {
-        google: 'google2.webm',
-        ios: 'ios.webm',
-        mac: 'mac2.webm',
-        notion: 'notion.webm'
-      };
-      
-      // Get OAuth proxy URL from the registry
-      const authProxyUrl = sourceData.oauth?.auth_proxy;
-      
       const configData = {
         name: sourceName,
         company: sourceData.company,
         platform: sourceData.platform || 'cloud',
-        deviceType: sourceName === 'ios' ? 'ios' : 
-                    sourceName === 'mac' ? 'macos' : undefined,
+        deviceType: sourceData.device_type || undefined,
         displayName: sourceData.display_name,
         description: sourceData.description,
         icon: sourceData.icon,
-        video: sourceData.video || videoMap[sourceName as string] || null,
-        authType: sourceData.auth?.type || (sourceData.platform === 'device' ? 'device_token' : 'oauth2'),
+        video: sourceData.video || null,
+        authType: sourceData.auth?.type || 'oauth2',
         defaultSyncSchedule: sourceData.sync?.default_schedule || '0 * * * *', // Default hourly
         minSyncFrequency: sourceData.sync?.min_frequency || 300, // 5 minutes
         maxSyncFrequency: sourceData.sync?.max_frequency || 86400, // 24 hours
         oauthConfig: {
-          authProxy: authProxyUrl,
+          authProxy: sourceData.auth?.auth_proxy,
           requiredScopes: [...new Set(streamScopes)] // Deduplicate scopes
         },
         syncConfig: sourceData.sync,
@@ -109,9 +123,8 @@ async function seedDatabase() {
       .limit(1);
     
     if (existing.length === 0) {
-      // Use ingestion type from registry or infer from source
-      const ingestionType = streamData.ingestion?.type || 
-                           (streamData.source === 'ios' || streamData.source === 'mac' ? 'push' : 'pull');
+      // Use ingestion type from registry data
+      const ingestionType = streamData.ingestion?.type || 'pull';
       
       // Extract cron schedule from sync config if available
       const cronSchedule = streamData.sync?.schedule || 
@@ -208,45 +221,225 @@ async function seedDatabase() {
         console.log(`✅ Created semantic config: ${semanticName}`);
       }
     }
-  } else {
-    // Fallback for old registry format - infer semantics from streams
-    const semanticStreams = Object.entries(registry.streams).filter(([streamName, streamData]) => {
-      return streamData.output_type === 'semantics' || 
-             (streamData.signals?.length === 0 && streamData.semantics?.length > 0);
-    });
-    
-    for (const [streamName, streamData] of semanticStreams) {
-      const semanticTypes = streamData.semantics || [];
-      for (const semanticType of semanticTypes) {
-        const semanticName = `${streamName}_${semanticType}`;
-        const existing = await db
-          .select()
-          .from(semanticConfigs)
-          .where(eq(semanticConfigs.semanticName, semanticName))
-          .limit(1);
-        
-        if (existing.length === 0) {
-          await db.insert(semanticConfigs).values({
-            semanticName: semanticName,
-            displayName: `${streamData.display_name} - ${semanticType}`,
-            sourceName: streamData.source,
-            streamName: streamName,
-            semanticType: semanticType,
-            status: 'active',
-            description: streamData.description,
-            settings: {
-              sync: streamData.sync,
-              processing: streamData.processing,
-              storage: streamData.storage,
-            },
-          });
-          console.log(`✅ Created semantic config: ${semanticName}`);
-        }
-      }
-    }
-  }
+  } 
 
+  // Create test source instances for development
+  console.log('🧪 Creating test source instances...');
+  
+  // Import sources table
+  const { sources } = await import('../src/lib/db/schema');
+  
+  // Create test iOS device for development
+  const testIosDevice = {
+    id: '00000000-0000-0000-0000-000000000101',
+    sourceName: 'ios',
+    instanceName: "Test iPhone (Demo)",
+    status: 'paused' as const,  // Paused to prevent sync attempts
+    deviceId: 'dev_iphone_001',
+    deviceToken: 'DEV_TOKEN_001',
+    deviceType: 'ios' as const,
+    deviceLastSeen: new Date(),
+    sourceMetadata: {
+      os_version: '17.0',
+      model: 'iPhone 15 Pro',
+      app_version: '1.0.0',
+      isTest: true  // Mark as test source
+    }
+  };
+  
+  const existingIos = await db
+    .select()
+    .from(sources)
+    .where(eq(sources.deviceId, 'dev_iphone_001'))
+    .limit(1);
+  
+  if (existingIos.length === 0) {
+    await db.insert(sources).values(testIosDevice);
+    console.log('  ✅ Created test iOS device');
+  } else {
+    console.log('  ℹ️  Test iOS device already exists');
+  }
+  
+  // Create test Google Calendar source
+  const testGoogleSource = {
+    id: '00000000-0000-0000-0000-000000000102',
+    sourceName: 'google',
+    instanceName: "Test Google Account (Demo)",
+    status: 'paused' as const,  // Paused to prevent sync attempts with fake tokens
+    deviceId: 'test_google_account',
+    oauthAccessToken: 'test_access_token_google',
+    oauthRefreshToken: 'test_refresh_token_google',
+    oauthExpiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+    scopes: [
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events.readonly'
+    ],
+    sourceMetadata: {
+      email: 'testuser@example.com',
+      name: 'Test User',
+      isTest: true  // Mark as test source
+    }
+  };
+  
+  const existingGoogle = await db
+    .select()
+    .from(sources)
+    .where(eq(sources.deviceId, 'test_google_account'))
+    .limit(1);
+  
+  if (existingGoogle.length === 0) {
+    await db.insert(sources).values(testGoogleSource);
+    console.log('  ✅ Created test Google source');
+  } else {
+    console.log('  ℹ️  Test Google source already exists');
+  }
+  
   console.log('✅ Database seeding complete!');
+  
+  // Seed test data via ingest endpoint
+  await seedTestData();
+}
+
+async function seedTestData() {
+  console.log('\n📤 Seeding test data via ingest endpoint...');
+  
+  const testDir = fs.existsSync('/app/tests') ? '/app/tests' : path.join(rootDir, 'tests');
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
+  // Seed iOS Location data directly to MinIO
+  try {
+    const iosLocationFile = path.join(testDir, 'test_data_ios_location.json');
+    if (fs.existsSync(iosLocationFile)) {
+      const testData = JSON.parse(fs.readFileSync(iosLocationFile, 'utf-8'));
+      
+      // Set MinIO endpoint for local access
+      if (!process.env.MINIO_ENDPOINT) {
+        process.env.MINIO_ENDPOINT = 'localhost:9000';
+      }
+      
+      // Store directly to MinIO via the MinIO client library
+      const { storeStreamData } = await import('../src/lib/minio');
+      
+      // Create a proper stream data format
+      const streamData = {
+        stream_name: 'ios_location',
+        source_name: 'ios',
+        device_id: 'dev_iphone_001',
+        data: testData.data,
+        batch_metadata: {
+          total_points: testData.data.length,
+          date: '2025-07-01',
+          start_time: testData.data[0].timestamp,
+          end_time: testData.data[testData.data.length - 1].timestamp
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      // Store to MinIO
+      const { key: streamKey, sizeBytes } = await storeStreamData(
+        'ios_location',
+        streamData,
+        {
+          'x-source-id': '00000000-0000-0000-0000-000000000101', // Use the test iOS device ID
+          'x-stream-name': 'ios_location',
+          'x-device-id': 'dev_iphone_001'
+        }
+      );
+      
+      console.log(`  ✅ iOS Location: Stored ${testData.data.length} location points to MinIO (${formatBytes(sizeBytes)})`);
+      
+      // Get the stream ID for ios_location
+      const [streamConfig] = await db
+        .select()
+        .from(streamConfigs)
+        .where(eq(streamConfigs.streamName, 'ios_location'))
+        .limit(1);
+      
+      // Queue processing task to create signals
+      const { queueCeleryTask } = await import('../src/lib/redis');
+      const taskId = await queueCeleryTask('process_stream_batch', [
+        'ios_location',
+        streamKey,
+        'seed-activity-002', // Dummy pipeline activity ID for seeding
+        streamConfig?.id || 'seed-stream-002'  // Use actual stream ID or dummy
+      ]);
+      
+      console.log(`  📋 Queued iOS location processing task: ${taskId}`);
+    }
+  } catch (error) {
+    console.log(`  ❌ iOS Location error:`, error);
+  }
+  
+  // Seed Google Calendar data directly to MinIO
+  try {
+    const googleCalendarFile = path.join(testDir, 'test_data_google_calendar.json');
+    if (fs.existsSync(googleCalendarFile)) {
+      const testData = JSON.parse(fs.readFileSync(googleCalendarFile, 'utf-8'));
+      
+      // Set MinIO endpoint for local access
+      if (!process.env.MINIO_ENDPOINT) {
+        process.env.MINIO_ENDPOINT = 'localhost:9000';
+      }
+      
+      // Store directly to MinIO via the MinIO client library
+      const { storeStreamData } = await import('../src/lib/minio');
+      
+      // Create a proper stream data format
+      const streamData = {
+        stream_name: 'google_calendar',
+        source_name: 'google',
+        events: testData.events,
+        batch_metadata: {
+          total_records: testData.events.length,
+          date: '2025-07-01',
+          sync_type: 'full'
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      // Store to MinIO
+      const { key: streamKey, sizeBytes } = await storeStreamData(
+        'google_calendar',
+        streamData,
+        {
+          'x-source-id': '00000000-0000-0000-0000-000000000102', // Use the test Google source ID
+          'x-stream-name': 'google_calendar'
+        }
+      );
+      
+      console.log(`  ✅ Google Calendar: Stored ${testData.events.length} events to MinIO (${formatBytes(sizeBytes)})`);
+      
+      // Get the stream ID for google_calendar
+      const [streamConfig] = await db
+        .select()
+        .from(streamConfigs)
+        .where(eq(streamConfigs.streamName, 'google_calendar'))
+        .limit(1);
+      
+      // Queue processing task to create signals
+      const { queueCeleryTask } = await import('../src/lib/redis');
+      const taskId = await queueCeleryTask('process_stream_batch', [
+        'google_calendar',
+        streamKey,
+        'seed-activity-001', // Dummy pipeline activity ID for seeding
+        streamConfig?.id || 'seed-stream-001'  // Use actual stream ID or dummy
+      ]);
+      
+      console.log(`  📋 Queued Google Calendar processing task: ${taskId}`);
+    }
+  } catch (error) {
+    console.log(`  ❌ Google Calendar error:`, error);
+  }
+  
+  console.log('\n✨ Test data seeding complete!');
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 async function main() {

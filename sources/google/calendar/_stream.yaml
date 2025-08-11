@@ -1,4 +1,4 @@
-# Google Calendar Stream Configuration  
+# Google Calendar Stream Configuration
 # Calendar events and appointments from Google Calendar API
 
 name: google_calendar
@@ -8,28 +8,33 @@ description: Calendar events and appointments
 
 # Stream processing settings
 ingestion:
-  type: pull  # We fetch from Google API
+  type: pull # We fetch from Google API
   batch_type: events
   raw_data_type: CalendarEvent
-  
+
 # API configuration
 api:
   endpoint: https://www.googleapis.com/calendar/v3
-  rate_limit: 100  # requests per minute
+  rate_limit: 100 # requests per minute
   pagination: true
   max_results: 250
-  
+
 # Sync configuration
 sync:
-  schedule: "*/15 * * * *"  # Every 15 minutes
-  type: token  # Uses sync tokens exclusively (no date ranges)
-    
+  schedule: "*/15 * * * *" # Every 15 minutes
+  type: token # Uses sync tokens exclusively (no date ranges)
+
 # Processing configuration
 processing:
   normalization: true
-  validation:
-    required_fields:
-      - id
-      - summary
-      - start
-      - end
+  
+# Stream processor configuration
+processor:
+  class_name: StreamProcessor
+  source_name: google
+  stream_type: events
+  # Signals are auto-discovered from subdirectories with _signal.yaml files
+  deduplication_strategy: multiple  # Events can occur at same timestamp
+  event_id_fields:  # Fields to use for deduplication
+    - event_id
+    - calendar_id

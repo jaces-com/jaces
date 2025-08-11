@@ -76,11 +76,20 @@ class LocationManager: NSObject, ObservableObject {
             return
         }
         
+        // Check if location is enabled in configuration
+        let isEnabled = DeviceManager.shared.configuration.isStreamEnabled("location")
+        guard isEnabled else {
+            print("⏸️ Location stream disabled in web app configuration")
+            return
+        }
+        
+        print("📍 Starting location tracking")
         isTracking = true
         locationManager.startUpdatingLocation()
         locationManager.startMonitoringSignificantLocationChanges()
         
         // Start the 10-second timer for location sampling
+        print("⏱️ Starting location timer with 10-second interval")
         startLocationTimer()
     }
     
@@ -124,16 +133,20 @@ extension LocationManager {
         locationTimer?.invalidate()
         
         // Create a new timer that fires every 10 seconds
+        print("⏱️ Creating location timer that fires every 10 seconds")
         locationTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            print("⏰ Location timer fired - sampling location...")
             self?.sampleCurrentLocation()
         }
         
         // Ensure timer runs in common modes (including background)
         if let timer = locationTimer {
             RunLoop.current.add(timer, forMode: .common)
+            print("✅ Location timer added to RunLoop.common")
         }
         
         // Fire immediately to capture the first location
+        print("🚀 Triggering immediate location sample")
         locationTimer?.fire()
     }
     
@@ -180,7 +193,7 @@ extension LocationManager {
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(streamData)
             
-            let success = SQLiteManager.shared.enqueue(streamName: "apple_ios_core_location", data: data)
+            let success = SQLiteManager.shared.enqueue(streamName: "ios_location", data: data)
             
             if success {
                 print("✅ Saved location sample to SQLite queue")

@@ -89,7 +89,7 @@ struct AnyCodable: Codable {
 }
 
 struct HealthKitStreamData: Codable {
-    let streamName: String = "apple_ios_healthkit"
+    let streamName: String = "ios_healthkit"
     let deviceId: String
     let data: [HealthKitMetric]
     let batchMetadata: BatchMetadata

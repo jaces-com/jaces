@@ -66,7 +66,7 @@ Think of it as your:
 ### Architecture Highlights
 
 - **Hot Day, Cold Night**: Real-time processing for "what's happening now?" transitions to nightly consolidation for "what did today mean?"
-- **Data Pipeline**: Sources → Streams → Signals & Semantics
+- **ELT Data Pipeline**: Sources (Extract) → Streams (Load) → Signals & Semantics (Transform)
   - **Signals**: Time-series data (heart rate changes, app switches, location moves)
   - **Semantics**: Content data (documents, notes, calendar events)
 - **Configuration-Driven**: Sources defined in YAML, UI auto-generates from config
@@ -142,6 +142,26 @@ Jaces follows a three-tier data architecture that processes your digital exhaust
      Raw Data         Time-Series         Signals: State changes
    (APIs, Files)    (Processed Data)      Semantics: Content/docs
 ```
+
+### The ELT Paradigm
+
+Jaces follows the modern **ELT (Extract, Load, Transform)** data engineering pattern, where raw data preservation and flexible transformation are prioritized:
+
+- **Extract (Sources)**: Pull raw data from APIs, files, and device sensors without heavy processing
+- **Load (Streams)**: Store time-series data in MinIO and PostgreSQL, maintaining full fidelity
+- **Transform (Signals & Semantics)**: Apply intelligent transformations on-demand:
+  - **Signals**: PELT algorithms detect meaningful state changes and transitions
+  - **Semantics**: Vector embeddings and knowledge extraction from documents
+
+#### Why ELT Matters for Personal Data
+
+Traditional ETL (Extract, Transform, Load) systems transform data before storage, losing raw information forever. Jaces' ELT approach means:
+
+- **Never lose raw data**: Your original data is preserved, allowing future reprocessing as algorithms improve
+- **Flexible analysis**: Add new signal detectors or semantic extractors without re-ingesting data
+- **Time travel**: Replay and reanalyze past events with new insights or corrected algorithms
+- **Incremental processing**: Transform only what's needed, when it's needed, saving compute resources
+- **Audit trail**: Full lineage from raw source to final insight is always available
 
 ### Hot Day, Cold Night Architecture
 
@@ -256,8 +276,8 @@ See [LICENSE](./LICENSE) for complete details.
 
 ## Axioms
 
-- If the product is free, you are the product.
-- An AI with a conscience—yours.
-- We built Jaces with the intent to use AI to increase human agency, not detract from it.
-- Your data should work for you, not against you.
+- Headless personal data.
 - The protocol for personal intelligence.
+- An AI with a conscience—yours.
+- Your data should work for you, not against you.
+- We built Jaces with the intent to use AI to increase human agency, not detract from it.

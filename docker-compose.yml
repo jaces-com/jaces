@@ -101,6 +101,7 @@ services:
       - ./apps/web/tsconfig.json:/app/tsconfig.json
       - ./apps/web/scripts:/app/scripts
       - ./sources:/app/sources
+      - ./tests:/app/tests
 
   # Celery Worker Service
   celery-worker:
@@ -132,6 +133,7 @@ services:
       # Mount for hot reload in development
       - ./sources:/app/sources
       - ./scripts:/app/scripts
+      - ./tests:/app/tests
 
   # Celery Beat Service (Scheduler)
   celery-beat:
@@ -153,6 +155,7 @@ services:
       # Mount for hot reload in development
       - ./sources:/app/sources
       - ./scripts:/app/scripts
+      - ./tests:/app/tests
 
   # Processing Service (Boundary Detection, etc.)
   processing:

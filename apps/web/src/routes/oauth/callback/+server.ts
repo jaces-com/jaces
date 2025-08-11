@@ -22,18 +22,24 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const provider = url.searchParams.get('provider');
 	const errorParam = url.searchParams.get('error');
 
-	// Determine return path from state parameter
-	// NOTE: The OAuth proxy at auth.jaces.com needs to be updated to pass the state parameter through
-	// We've updated the code in apps/oauth-proxy but it needs to be deployed
+	// Parse state parameter which contains both return path and source ID
 	const state = url.searchParams.get('state');
-	let returnPath = state || '/data/sources';
+	let returnPath = '/data/sources';
+	let pendingSourceId: string | null = null;
+	
+	if (state) {
+		// State format: "returnPath|sourceId" or just "returnPath"
+		const stateParts = state.split('|');
+		returnPath = stateParts[0] || '/data/sources';
+		pendingSourceId = stateParts[1] || null;
+	}
 	
 	// Ensure the return path is valid and safe
 	if (!returnPath.startsWith('/')) {
 		returnPath = '/data/sources';
 	}
 	
-	console.log(`OAuth callback - state: ${state}, returning to: ${returnPath}`);
+	console.log(`OAuth callback - state: ${state}, returnPath: ${returnPath}, sourceId: ${pendingSourceId}`);
 
 	// Handle OAuth errors
 	if (errorParam) {
@@ -80,40 +86,65 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 			? new Date(Date.now() + parseInt(expiresIn) * 1000)
 			: null;
 
-		// Check if an instance already exists for this source
-		const instanceName = `${sourceConfig.displayName || sourceConfig.name} Account`;
-		const [existingSource] = await db
-			.select()
-			.from(sources)
-			.where(
-				eq(sources.sourceName, sourceName)
-			)
-			.limit(1);
-
 		let sourceInstance;
 		
-		if (existingSource) {
-			// Update existing instance with new OAuth tokens
-			const [updatedSource] = await db
-				.update(sources)
-				.set({
-					status: 'authenticated',
-					oauthAccessToken: accessToken,
-					oauthRefreshToken: refreshToken || null,
-					oauthExpiresAt: expiresAt,
-					scopes: requiredScopes,
-					sourceMetadata: {
-						connectedAt: new Date().toISOString(),
-						provider: provider
-					},
-					updatedAt: new Date()
-				})
-				.where(eq(sources.id, existingSource.id))
-				.returning();
-			sourceInstance = updatedSource;
-			console.log(`OAuth connection successful: updated existing source instance ${updatedSource.id} for ${sourceName}`);
+		if (pendingSourceId) {
+			// Update the specific pending source with OAuth tokens
+			const [existingSource] = await db
+				.select()
+				.from(sources)
+				.where(eq(sources.id, pendingSourceId))
+				.limit(1);
+			
+			if (existingSource && existingSource.status === 'pending') {
+				// Update the pending source with OAuth credentials
+				const [updatedSource] = await db
+					.update(sources)
+					.set({
+						status: 'authenticated',
+						oauthAccessToken: accessToken,
+						oauthRefreshToken: refreshToken || null,
+						oauthExpiresAt: expiresAt,
+						scopes: requiredScopes,
+						sourceMetadata: {
+							...((existingSource.sourceMetadata as any) || {}),
+							connectedAt: new Date().toISOString(),
+							provider: provider,
+							isPending: false
+						},
+						updatedAt: new Date()
+					})
+					.where(eq(sources.id, pendingSourceId))
+					.returning();
+				sourceInstance = updatedSource;
+				console.log(`OAuth connection successful: updated pending source ${updatedSource.id} for ${sourceName}`);
+			} else {
+				console.warn(`Pending source ${pendingSourceId} not found or not in pending status`);
+				// Fall back to creating a new source
+				const instanceName = `${sourceConfig.displayName || sourceConfig.name} Account`;
+				const [newSource] = await db
+					.insert(sources)
+					.values({
+						sourceName: sourceName,
+						instanceName: instanceName,
+						status: 'authenticated',
+						oauthAccessToken: accessToken,
+						oauthRefreshToken: refreshToken || null,
+						oauthExpiresAt: expiresAt,
+						scopes: requiredScopes,
+						sourceMetadata: {
+							connectedAt: new Date().toISOString(),
+							provider: provider
+						}
+					})
+					.returning();
+				sourceInstance = newSource;
+				console.log(`OAuth connection successful: created new source ${newSource.id} for ${sourceName}`);
+			}
 		} else {
-			// Create a new source instance for this OAuth connection
+			// No pending source ID provided - create a new source
+			// This maintains backward compatibility
+			const instanceName = `${sourceConfig.displayName || sourceConfig.name} Account`;
 			const [newSource] = await db
 				.insert(sources)
 				.values({

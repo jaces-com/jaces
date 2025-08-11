@@ -1,52 +1,46 @@
 # Google Calendar Events Signal Configuration
-# Calendar event activity tracking
+# Calendar events and meetings
 
 name: google_calendar_events
 source: google
 stream: google_calendar
 display_name: Calendar Events
-description: Calendar event density and meeting patterns
+description: Calendar events and meetings
 
 # Units and measurement
 unit:
-  ucum: /h  # events per hour
-  display: events/hr
-  range: [0, 10]
+  ucum: 1 # Dimensionless unit for discrete events
+  display: event
 
 # Transition detection algorithm
 computation:
-  algorithm: pelt
-  cost_function: l1
-  analysis_type: categorical  # Events are discrete occurrences
-  min_segment_size: 5
-  penalty_multiplier: 1.2
-  gap_threshold_seconds: 3600  # 1 hour
-
+  algorithm: event_detection
+  analysis_type: categorical # Events are discrete occurrences
+  value_type: event # Display as event blocks in visualization
+  
 # Processing schedule
 schedule:
-  cron: "0 */2 * * *"  # Every 2 hours
+  cron: "*/15 * * * *"
   priority: medium
 
 # Signal importance
 weight:
   macro: 0.7
   micro: 0.65
-  
+
 # Transition settings
 transitions:
-  min_gap_seconds: 1800  # 30 minutes
-  min_change: 2  # Minimum change in events/hour
-  confidence_threshold: 0.75
-  
-# Event categories
-categories:
-  work: ["meeting", "standup", "1:1", "review", "sync"]
-  personal: ["appointment", "lunch", "break", "personal"]
-  focus: ["focus time", "deep work", "coding", "writing"]
-  
+  min_gap_seconds: 1800 # 30 minutes between distinct event clusters
+  confidence_threshold: 0.85
+
+# Transition detector class
+detector: CalendarEventsTransitionDetector
+
 # Metadata
 metadata:
-  aggregation_window: 3600  # 1 hour windows
-  include_all_day_events: false
-  include_declined: false
-  outlier_removal: false
+  event_types:
+    - meeting
+    - focus_time
+    - out_of_office
+    - appointment
+    - reminder

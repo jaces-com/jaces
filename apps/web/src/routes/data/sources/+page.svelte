@@ -1,58 +1,11 @@
 <script lang="ts">
 	import { Page, Badge, Button } from "$lib/components";
+	import { page } from "$app/stores";
+	import { formatDate, formatRelativeTime } from "$lib/utils/format";
 	import "iconify-icon";
 	import type { PageData } from "./$types";
 
-	// Import videos directly
-	import googleVideo from "$lib/assets/videos/google2.webm";
-	import iosVideo from "$lib/assets/videos/ios.webm";
-	import macVideo from "$lib/assets/videos/mac2.webm";
-	import notionVideo from "$lib/assets/videos/notion.webm";
-
-	// Create a map of source names to video URLs
-	const videoMap: Record<string, string> = {
-		google: googleVideo,
-		ios: iosVideo,
-		mac: macVideo,
-		notion: notionVideo,
-	};
-
-	function getVideoSrc(sourceName: string): string | null {
-		return videoMap[sourceName] || null;
-	}
-
 	let { data }: { data: PageData } = $props();
-
-	// Track which card is being hovered
-	let hoveredSource = $state<string | null>(null);
-
-	// Store video element references
-	let videoElements: Record<string, HTMLVideoElement> = {};
-
-	// Video action to handle play/pause
-	function handleVideo(node: HTMLVideoElement) {
-		const sourceName = node.dataset.sourceName;
-
-		// Preload the video to avoid flash
-		node.load();
-
-		$effect(() => {
-			if (hoveredSource === sourceName) {
-				node.play().catch(() => {
-					// Ignore autoplay errors
-				});
-			} else {
-				node.pause();
-				// Don't reset currentTime to avoid flash
-			}
-		});
-
-		return {
-			destroy() {
-				// Cleanup if needed
-			},
-		};
-	}
 
 	// Timer for real-time "last seen" updates
 	let currentTime = $state(new Date());
@@ -66,213 +19,354 @@
 	});
 
 	// Get status badge variant for a source
-	function getStatusBadgeVariant(source: any): "success" | "error" | "warning" | "default" | "info" {
-		if (!source.is_connected) {
-			return source.enabled ? "info" : "default";
-		}
-		
-		switch (source.status) {
-			case 'active':
-				return 'success';
-			case 'authenticated':
-				return 'warning';
-			case 'paused':
-				return 'default';
-			case 'needs_reauth':
-			case 'error':
-				return 'error';
+	function getStatusBadgeVariant(
+		status: string | null,
+	): "success" | "error" | "warning" | "default" | "info" {
+		switch (status) {
+			case "active":
+				return "success";
+			case "authenticated":
+				return "warning";
+			case "paused":
+				return "default";
+			case "needs_reauth":
+			case "error":
+				return "error";
 			default:
-				return 'default';
+				return "default";
 		}
 	}
 
 	// Get status display text for a source
-	function getStatusText(source: any): string {
-		if (!source.is_connected) {
-			return source.enabled ? 'Available' : 'Disabled';
-		}
-		
-		switch (source.status) {
-			case 'authenticated':
-				return 'Setup Required';
-			case 'active':
-				return 'Active';
-			case 'paused':
-				return 'Paused';
-			case 'needs_reauth':
-				return 'Reconnect';
-			case 'error':
-				return 'Error';
+	function getStatusText(status: string | null): string {
+		switch (status) {
+			case "authenticated":
+				return "Setup Required";
+			case "active":
+				return "Active";
+			case "paused":
+				return "Paused";
+			case "needs_reauth":
+				return "Reconnect";
+			case "error":
+				return "Error";
 			default:
-				return 'Unknown';
+				return "Inactive";
 		}
 	}
 
-	// Get button text based on source status
-	function getButtonText(source: any): string {
-		if (!source.is_connected) {
-			return 'Connect';
-		}
-		
-		switch (source.status) {
-			case 'authenticated':
-				return 'Configure';
-			case 'active':
-				return 'View';
-			case 'paused':
-				return 'Resume';
-			case 'needs_reauth':
-				return 'Reconnect';
-			case 'error':
-				return 'Fix';
-			default:
-				return 'View';
-		}
-	}
+	// Get connected sources (flattened list of all instances)
+	const connectedSources = $derived(
+		data.sources
+			.filter((s) => s.is_connected)
+			.flatMap((source) => {
+				if (
+					source.multiple_connections &&
+					source.instances &&
+					source.instances.length > 0
+				) {
+					// For device sources, return all instances
+					return source.instances.map((instance) => ({
+						id: instance.id,
+						sourceName: source.name,
+						sourceDisplayName: source.display_name,
+						instanceName: instance.instanceName,
+						icon: source.icon,
+						platform: source.platform,
+						status: instance.status,
+						lastSyncAt: instance.lastSyncAt,
+						createdAt: instance.createdAt,
+						signalCount: source.active_signals_count,
+					}));
+				} else if (source.is_connected) {
+					// For cloud sources, return single instance
+					return [
+						{
+							id: source.id,
+							sourceName: source.name,
+							sourceDisplayName: source.display_name,
+							instanceName:
+								source.device_name || source.display_name,
+							icon: source.icon,
+							platform: source.platform,
+							status: source.status,
+							lastSyncAt: source.last_seen,
+							createdAt: null,
+							signalCount: source.active_signals_count,
+						},
+					];
+				}
+				return [];
+			}),
+	);
 
-	// Get button href based on source status
-	function getButtonHref(source: any): string {
-		if (!source.is_connected) {
-			return `/data/sources/new?source=${source.name}`;
-		}
-		
-		if (source.status === 'authenticated') {
-			return `/data/sources/new?source=${source.name}&configure=true`;
-		}
-		
-		if (source.status === 'needs_reauth') {
-			return `/data/sources/new?source=${source.name}&reauth=true`;
-		}
-		
-		return `/data/sources/${source.id}`;
-	}
+	// Summary stats
+	const totalSources = $derived(connectedSources.length);
+	const activeSources = $derived(
+		connectedSources.filter((s) => s.status === "active").length,
+	);
+	const totalSignals = $derived(
+		connectedSources.reduce((sum, s) => sum + (s.signalCount || 0), 0),
+	);
 </script>
 
 <Page>
-	<div class="">
-		<div class="flex justify-between items-center mb-8">
-			<div>
-				<h1 class="text-3xl text-neutral-900 mb-2 font-mono">
-					Data Sources
-				</h1>
-				<p class="text-neutral-600">
-					Connect your devices and cloud services to start syncing
-					data
-				</p>
+	<div class="space-y-6">
+		<!-- Header -->
+		<div>
+			<div class="flex items-center justify-between mb-4">
+				<div>
+					<h1 class="text-3xl text-neutral-900 font-mono">
+						Data Sources
+					</h1>
+					<p class="text-neutral-600 mt-1">
+						Manage your connected data sources and devices
+					</p>
+				</div>
+				<Button
+					type="link"
+					href="/data/sources/catalog"
+					text="+ Add Source"
+					variant="filled"
+				/>
 			</div>
 		</div>
 
 		{#if data.error}
-			<div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+			<div class="bg-red-50 border border-red-200 rounded-lg p-4">
 				<p class="text-red-700">{data.error}</p>
 			</div>
 		{/if}
 
-		<!-- All Sources -->
-		{#if data.sources && data.sources.length > 0}
-			<div class="mb-12">
-				<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-					{#each data.sources as source}
-						{@const videoSrc = getVideoSrc(source.name)}
-						<div
-							class="group bg-white border border-neutral-200 rounded-lg overflow-hidden hover:border-neutral-300 transition-colors duraiton-300 cursor-pointer"
-							role="button"
-							tabindex="0"
-							onmouseenter={() => (hoveredSource = source.name)}
-							onmouseleave={() => (hoveredSource = null)}
-							onclick={() => {
-								window.location.href = getButtonHref(source);
-							}}
-							onkeydown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									window.location.href = getButtonHref(source);
-								}
-							}}
+		<!-- Summary Stats -->
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="bg-white border border-neutral-200 rounded-lg p-4">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-neutral-500 font-medium">
+							Total Sources
+						</p>
+						<p
+							class="text-2xl font-bold text-neutral-900 font-mono mt-1"
 						>
-							{#if videoSrc}
-								<div
-									class="relative w-full aspect-video bg-neutral-900 overflow-hidden"
-								>
-									<video
-										class="absolute inset-0 w-full h-full object-cover"
-										muted
-										loop
-										playsinline
-										bind:this={videoElements[source.name]}
-										use:handleVideo
-										data-source-name={source.name}
-									>
-										<source
-											src={videoSrc}
-											type="video/webm"
-										/>
-									</video>
-								</div>
-							{/if}
-							<div class="p-6">
-								<div
-									class="flex items-center justify-between mb-2"
-								>
-									<div class="flex items-center gap-3">
-										{#if source.icon}
-											<iconify-icon
-												icon={source.icon}
-												class="text-2xl text-neutral-700"
-											></iconify-icon>
-										{/if}
-										<h3
-											class="text-xl font-semibold text-neutral-900 font-mono"
-										>
-											{source.display_name}
-										</h3>
-									</div>
-									<Badge
-										variant={getStatusBadgeVariant(source)}
-										size="sm"
-									>
-										{getStatusText(source)}
-									</Badge>
-								</div>
-								<p class="text-sm text-neutral-600 my-4">
-									{source.description}
-								</p>
-								<div class="flex flex-col gap-2 text-sm">
-									<div class="flex justify-between">
-										<span class="text-neutral-500"
-											>Platform:</span
-										>
-										<span class="text-neutral-700"
-											>{source.platform}</span
-										>
-									</div>
-									<div class="flex justify-between">
-										<span class="text-neutral-500"
-											>Auth:</span
-										>
-										<span class="text-neutral-700"
-											>{source.auth_type}</span
-										>
-									</div>
-								</div>
-								<div class="mt-4">
-									<Button
-										href={getButtonHref(source)}
-										text={getButtonText(source)}
-										type="link"
-										variant={source.is_connected
-											? "filled"
-											: "outline"}
-										className={source.is_connected
-											? "group-hover:bg-gradient-to-br group-hover:from-blue-700 group-hover:via-blue-600 group-hover:to-indigo-400"
-											: "group-hover:bg-neutral-800 group-hover:text-white"}
-									/>
-								</div>
-							</div>
-						</div>
-					{/each}
+							{totalSources}
+						</p>
+					</div>
+					<iconify-icon
+						icon="ri:database-2-line"
+						class="text-3xl text-neutral-400"
+					></iconify-icon>
 				</div>
 			</div>
+			<div class="bg-white border border-neutral-200 rounded-lg p-4">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-neutral-500 font-medium">
+							Active
+						</p>
+						<p
+							class="text-2xl font-bold text-green-600 font-mono mt-1"
+						>
+							{activeSources}
+						</p>
+					</div>
+					<iconify-icon
+						icon="ri:pulse-line"
+						class="text-3xl text-green-400"
+					></iconify-icon>
+				</div>
+			</div>
+			<div class="bg-white border border-neutral-200 rounded-lg p-4">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm text-neutral-500 font-medium">
+							Signals
+						</p>
+						<p
+							class="text-2xl font-bold text-blue-600 font-mono mt-1"
+						>
+							{totalSignals}
+						</p>
+					</div>
+					<iconify-icon
+						icon="ri:line-chart-line"
+						class="text-3xl text-blue-400"
+					></iconify-icon>
+				</div>
+			</div>
+		</div>
+
+		<!-- Connected Sources Table -->
+		{#if connectedSources.length > 0}
+			<div
+				class="bg-white border border-neutral-200 rounded-lg overflow-hidden"
+			>
+				<div
+					class="px-6 py-4 bg-neutral-50 border-b border-neutral-200"
+				>
+					<h2 class="text-lg font-mono text-neutral-900">
+						Connected Sources
+					</h2>
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full">
+						<thead
+							class="bg-neutral-50 border-b border-neutral-200"
+						>
+							<tr>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Source
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Instance
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Platform
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Status
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Last Sync
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Signals
+								</th>
+								<th
+									class="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Actions
+								</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white divide-y divide-neutral-200">
+							{#each connectedSources as source}
+								<tr
+									class="hover:bg-neutral-50 transition-colors"
+								>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<div class="flex items-center gap-2">
+											{#if source.icon}
+												<iconify-icon
+													icon={source.icon}
+													class="text-xl text-neutral-700"
+												></iconify-icon>
+											{/if}
+											<span
+												class="text-sm font-medium text-neutral-900"
+											>
+												{source.sourceDisplayName}
+											</span>
+										</div>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<span class="text-sm text-neutral-700">
+											{source.instanceName}
+										</span>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<Badge variant="default" size="sm">
+											{source.platform}
+										</Badge>
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<Badge
+											variant={getStatusBadgeVariant(
+												source.status,
+											)}
+											size="sm"
+										>
+											{getStatusText(source.status)}
+										</Badge>
+									</td>
+									<td
+										class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+									>
+										{#if source.lastSyncAt}
+											{formatRelativeTime(
+												source.lastSyncAt,
+												currentTime,
+											)}
+										{:else}
+											Never
+										{/if}
+									</td>
+									<td class="px-6 py-4 whitespace-nowrap">
+										<span class="text-sm text-neutral-700">
+											{source.signalCount || 0}
+										</span>
+									</td>
+									<td
+										class="px-6 py-4 whitespace-nowrap text-right"
+									>
+										<div class="flex justify-end gap-2">
+											<Button
+												href={`/data/sources/${source.id}`}
+												text="View"
+												variant="secondary"
+												size="sm"
+											/>
+											{#if source.status === "active"}
+												<Button
+													text="Pause"
+													variant="secondary"
+													size="sm"
+													disabled
+												/>
+											{:else if source.status === "paused"}
+												<Button
+													text="Resume"
+													variant="primary"
+													size="sm"
+													disabled
+												/>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		{:else}
+			<!-- Empty State -->
+			<div
+				class="bg-neutral-100 border border-neutral-200 rounded-lg p-12 text-center"
+			>
+				<iconify-icon
+					icon="ri:database-2-line"
+					class="text-6xl text-neutral-400 mx-auto mb-4"
+				></iconify-icon>
+				<h3 class="text-xl font-mono text-neutral-900 mb-2">
+					No sources connected
+				</h3>
+				<p class="text-neutral-600 mb-6">
+					Connect your first data source to start your data
+					sovereignty journey
+				</p>
+			</div>
 		{/if}
+
+		<!-- Footer -->
+		<div class="pt-4">
+			<p class="text-sm text-neutral-500">
+				{connectedSources.length} source{connectedSources.length !== 1
+					? "s"
+					: ""} connected
+			</p>
+		</div>
 	</div>
 </Page>

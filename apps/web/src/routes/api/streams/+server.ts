@@ -63,27 +63,23 @@ export const POST: RequestHandler = async ({ request }) => {
 		const { sourceName, sourceId, streamConfigs: streamSettings, instanceName, description } = body;
 
 		// Validate required fields
-		if (!sourceName) {
-			return json({ error: 'Source name is required' }, { status: 400 });
+		if (!sourceName || !sourceId) {
+			return json({ error: 'Source name and source ID are required' }, { status: 400 });
 		}
 
-		let targetSourceId = sourceId;
+		const targetSourceId = sourceId;
 
-		// If no sourceId provided, find it by source name
-		if (!targetSourceId) {
-			const [existingSource] = await db
-				.select()
-				.from(sources)
-				.where(eq(sources.sourceName, sourceName))
-				.limit(1);
+		// Verify the source exists
+		const [existingSource] = await db
+			.select()
+			.from(sources)
+			.where(eq(sources.id, targetSourceId))
+			.limit(1);
 
-			if (!existingSource) {
-				return json({ 
-					error: 'Source must be connected first. Please complete OAuth authentication.' 
-				}, { status: 400 });
-			}
-
-			targetSourceId = existingSource.id;
+		if (!existingSource) {
+			return json({ 
+				error: 'Source not found. Please ensure the source exists.' 
+			}, { status: 404 });
 		}
 
 		// Get all stream configs for this source type

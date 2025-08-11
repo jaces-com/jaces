@@ -13,6 +13,11 @@ ingestion:
   raw_data_type: AudioChunk
   chunk_duration_ms: 5000  # 5 second chunks
   
+# Sync configuration
+sync:
+  type: none  # No historical data sync - real-time only
+  schedule: "*/5 * * * *"  # Sync every 5 minutes for device uploads
+  
 # Signals produced by this stream
 signals:
   - audio_level

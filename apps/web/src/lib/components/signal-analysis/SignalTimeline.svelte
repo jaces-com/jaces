@@ -15,6 +15,7 @@
 		SpatialVisualization,
 		TransitionVisualization,
 		CountVisualization,
+		EventVisualization,
 	} from "./visualizations";
 	import { parseDate, toZoned } from "@internationalized/date";
 
@@ -39,6 +40,9 @@
 
 	export let name: string;
 	export let displayName: string;
+	export let sourceName: string;
+	export let streamName: string;
+	export let signalName: string;
 	export let company: "apple" | "google";
 	export let type: "event" | "continuous";
 	export let visualizationType:
@@ -55,7 +59,7 @@
 		| undefined;
 	export let showCursorOnExpandedHover: boolean = false;
 	export let selectedDate: string | undefined = undefined;
-	export let onSignalAnalysisComplete: (() => void) | undefined = undefined;
+	// Removed: onSignalAnalysisComplete - transitions now happen automatically
 	export let transitions: any[] = [];
 	export let hasTransitions: boolean = false;
 	export let userTimezone: string = "America/Chicago";
@@ -67,7 +71,6 @@
 
 	// View state
 	let isExpanded = true; // Default to expanded
-	let isComputingBoundaries = false;
 
 	// Get event width in pixels
 	function getEventWidth(start: Date, end: Date): number {
@@ -83,131 +86,7 @@
 		});
 	}
 
-	// Run single signal transition detection
-	async function runSingleSignalTransitionDetection() {
-		isComputingBoundaries = true;
-
-		try {
-			// Use the selectedDate prop or fall back to today
-			const dateToUse =
-				selectedDate || new Date().toISOString().split("T")[0];
-			const [year, month, day] = dateToUse.split("-").map(Number);
-
-			// Create start and end of day in user's timezone
-			const calendarDate = parseDate(
-				`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-			);
-			const zonedStart = toZoned(calendarDate, userTimezone);
-			const zonedEnd = zonedStart.add({
-				hours: 23,
-				minutes: 59,
-				seconds: 59,
-				milliseconds: 999,
-			});
-
-			// Convert to Date objects for the API
-			const startOfDay = zonedStart.toDate();
-			const endOfDay = zonedEnd.toDate();
-
-			const requestBody = {
-				userId: "00000000-0000-0000-0000-000000000001", // Default user ID
-				signalName: name,
-				startTime: startOfDay.toISOString(),
-				endTime: endOfDay.toISOString(),
-				timezone: userTimezone,
-			};
-
-			const response = await fetch("/api/signal-analysis/detect", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(requestBody),
-			});
-
-			if (!response.ok) {
-				throw new Error(
-					`HTTP ${response.status}: ${response.statusText}`,
-				);
-			}
-
-			const result = await response.json();
-
-			if (result.success) {
-				// Show success feedback
-				const detectionType = "transition";
-				toast.success(
-					`${detectionType.charAt(0).toUpperCase() + detectionType.slice(1)} detection started for ${displayName}`,
-					{
-						description: `Processing ${detectionType}s...`,
-						duration: 3000,
-					},
-				);
-
-				// Poll for completion
-				const taskId = result.taskId;
-				let pollAttempts = 0;
-				const maxPollAttempts = 30; // 30 seconds max
-				const pollInterval = 1000; // 1 second
-
-				const pollForCompletion = async () => {
-					if (pollAttempts >= maxPollAttempts) {
-						toast.error("Detection timed out", {
-							description:
-								"Please refresh the page to see results",
-						});
-						isComputingBoundaries = false;
-						return;
-					}
-
-					pollAttempts++;
-
-					try {
-						// For now, just wait and refresh since we don't have a task status endpoint
-						// In the future, we could check task status here
-
-						// After a few seconds, refresh the parent component
-						if (pollAttempts === 3) {
-							// After 3 seconds
-							toast.success(
-								`Detection completed for ${displayName}`,
-								{
-									description: `Found transitions`,
-									duration: 3000,
-								},
-							);
-
-							// Notify parent component to refresh data
-							if (onSignalAnalysisComplete) {
-								onSignalAnalysisComplete();
-							}
-							isComputingBoundaries = false;
-						} else {
-							// Continue polling
-							setTimeout(pollForCompletion, pollInterval);
-						}
-					} catch (error) {
-						console.error("Error polling for completion:", error);
-						isComputingBoundaries = false;
-					}
-				};
-
-				// Start polling after a short delay
-				setTimeout(pollForCompletion, pollInterval);
-			} else {
-				toast.error("Failed to start detection", {
-					description: result.error || "Unknown error",
-				});
-				isComputingBoundaries = false;
-			}
-		} catch (error) {
-			toast.error("Error starting detection", {
-				description:
-					error instanceof Error ? error.message : "Unknown error",
-			});
-			isComputingBoundaries = false;
-		}
-	}
+	// Removed: runSingleSignalTransitionDetection - transitions now happen automatically
 </script>
 
 <div
@@ -234,20 +113,15 @@
 				</svg>
 			</button>
 
-			<div class="flex items-center gap-3">
-				<h3 class="text-sm font-normal font-mono text-neutral-900 m-0">
-					{displayName}
-				</h3>
-				<Badge variant="default" size="sm">{name}</Badge>
-			</div>
+			<h3 class="text-sm font-normal font-mono text-neutral-900 m-0">
+				{displayName}
+			</h3>
 		</div>
 
 		<div class="flex gap-2 items-center">
-			<Badge variant="default" size="sm">{company}</Badge>
-			<Badge variant="secondary" size="sm">{type}</Badge>
-			{#if visualizationType}
-				<Badge variant="secondary" size="sm">{visualizationType}</Badge>
-			{/if}
+			<Badge variant="default" size="sm">{sourceName}</Badge>
+			<Badge variant="secondary" size="sm">{streamName}</Badge>
+			<Badge variant="secondary" size="sm">{signalName}</Badge>
 		</div>
 	</div>
 
@@ -333,45 +207,8 @@
 						<div
 							class="flex flex-col items-center justify-center p-6 text-neutral-400 text-[13px] gap-2"
 						>
-							{#if isComputingBoundaries}
-								<div class="flex items-center gap-2">
-									<svg
-										class="animate-spin h-4 w-4 text-blue-500"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											class="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										></circle>
-										<path
-											class="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									<span class="text-blue-500"
-										>Detecting transitions...</span
-									>
-								</div>
-							{:else}
-								<p>No transition markers detected</p>
-								{#if type !== "event"}
-									<button
-										type="button"
-										class="px-2 py-1 text-[10px] bg-blue-500 text-white border-none rounded cursor-pointer font-medium transition-colors duration-200 hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-										on:click|stopPropagation|preventDefault={runSingleSignalTransitionDetection}
-										disabled={isComputingBoundaries}
-									>
-										Detect Transitions
-									</button>
-								{/if}
-							{/if}
+							<p class="text-neutral-500">No transitions detected yet</p>
+							<p class="text-xs text-neutral-400">Transitions are detected automatically after signal creation</p>
 						</div>
 					{/if}
 				</div>
@@ -407,6 +244,8 @@
 								<SpatialVisualization signals={rawSignals} />
 							{:else if visualizationType === "count"}
 								<CountVisualization signals={rawSignals} {signalRange} />
+							{:else if visualizationType === "event"}
+								<EventVisualization signals={rawSignals} />
 							{:else}
 								<!-- Fallback for unknown visualization types -->
 								<div

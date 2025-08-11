@@ -1,5 +1,5 @@
 """Apple iOS Core Location stream processing module."""
 
-from .stream_processor import CoreLocationStreamProcessor
+from .stream_processor import StreamProcessor
 
-__all__ = ['CoreLocationStreamProcessor']
+__all__ = ['StreamProcessor']

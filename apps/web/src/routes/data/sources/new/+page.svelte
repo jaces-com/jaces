@@ -8,7 +8,7 @@
 		Textarea,
 		Radio,
 	} from "$lib/components";
-	import { goto } from "$app/navigation";
+	import { goto, invalidate } from "$app/navigation";
 	import { onDestroy } from "svelte";
 	import { toast } from "svelte-sonner";
 	import "iconify-icon";
@@ -56,7 +56,8 @@
 		settings: Record<string, any>;
 		enabled: boolean;
 		syncSchedule: string;
-		syncType?: 'token' | 'date_range' | 'hybrid';
+		syncType?: 'token' | 'date_range' | 'hybrid' | 'none';
+		supportsInitialSync?: boolean;
 		initialSyncType: "limited" | "full";
 		initialSyncDays: number;
 		initialSyncDaysFuture?: number;
@@ -95,13 +96,16 @@
 	let streamConfigs = $state<StreamConfig[]>(
 		data.streams?.map((stream: any) => {
 			// Check sync type from configuration
-			const syncType = stream.settings?.sync?.type || 'date_range';
+			const syncType = stream.settings?.sync?.type;
+			
+			// Determine if this stream supports initial sync based on sync type
+			const supportsInitialSync = syncType === 'date_range' || syncType === 'hybrid';
 			
 			// Detect if this stream supports future sync
 			const supportsFutureSync = 
 				(stream.settings?.sync?.initial_sync_days_future !== undefined ||
 				stream.settings?.sync?.lookahead_days !== undefined ||
-				stream.name?.includes('calendar')) && syncType !== 'token';
+				stream.name?.includes('calendar')) && syncType !== 'token' && syncType !== 'none';
 			
 			// Get default future days from stream config or use 30
 			const defaultFutureDays = 
@@ -111,8 +115,9 @@
 			return {
 				...stream,
 				enabled: true,
-				syncSchedule: stream.cronSchedule || "0 * * * *", // Default to hourly
+				syncSchedule: stream.settings?.sync?.schedule || stream.cronSchedule || "0 * * * *", // Default to hourly
 				syncType,  // Store the sync type
+				supportsInitialSync,  // New flag to control UI display
 				initialSyncType: syncType === 'token' ? "full" as const : "limited" as const,
 				initialSyncDays: stream.settings?.sync?.initial_sync_days || 90,
 				initialSyncDaysFuture: supportsFutureSync ? defaultFutureDays : undefined,
@@ -124,8 +129,10 @@
 	);
 
 	// Restore form data from localStorage if returning from OAuth
+	// Also restore device token if returning to a pending source
 	$effect(() => {
 		if (typeof window !== 'undefined') {
+			// Restore OAuth form data
 			const storageKey = `jaces_oauth_form_${data.source.name}`;
 			const saved = localStorage.getItem(storageKey);
 			if (saved) {
@@ -133,12 +140,29 @@
 					const formData = JSON.parse(saved);
 					instanceName = formData.instanceName || instanceName;
 					connectionDescription = formData.connectionDescription || "";
+					pendingSourceId = formData.pendingSourceId || null;
+					
+					// Update data.source.existingSource if we have a pending source
+					if (pendingSourceId) {
+						data.source.existingSource = {
+							id: pendingSourceId,
+							instanceName: instanceName,
+							status: 'authenticated'
+						};
+					}
+					
 					// Clean up after restoring
 					localStorage.removeItem(storageKey);
 				} catch (e) {
 					console.error('Failed to restore form data:', e);
 					localStorage.removeItem(storageKey);
 				}
+			}
+			
+			// If we have an existing source with pending status and a device token, restore it
+			if (data.source.existingSource?.status === 'pending' && data.source.existingSource?.deviceToken) {
+				generatedToken = data.source.existingSource.deviceToken;
+				instanceName = data.source.existingSource.instanceName || instanceName;
 			}
 		}
 	});
@@ -191,18 +215,18 @@
 		errorMessage = "";
 
 		try {
-			// Save the device source configuration
-			const response = await fetch("/api/sources", {
+			// Update the existing device source with stream configurations
+			// The source was already created when the token was generated
+			const response = await fetch("/api/streams", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
 					sourceName: data.source.name,
-					instanceName,
+					sourceId: data.source.existingSource?.id,
+					instanceName: instanceName,
 					description: connectionDescription,
-					deviceToken: generatedToken,
-					status: "pending", // Will become active when device connects
 					streamConfigs: streamConfigs
 						.filter((s) => s.enabled)
 						.map((s) => ({
@@ -238,6 +262,9 @@
 			toast.success("Configuration saved successfully!", {
 				description: "Starting initial sync..."
 			});
+
+			// Invalidate sources data to ensure fresh data when navigating back
+			await invalidate('app:sources');
 
 			// Redirect to source detail page or sources list
 			await goto(`/data/sources/${result.id || ""}`);
@@ -357,6 +384,9 @@
 				description: "Starting initial sync..."
 			});
 
+			// Invalidate sources data to ensure fresh data when navigating back
+			await invalidate('app:sources');
+
 			// Redirect to the source detail page
 			await goto(`/data/sources/${result.sourceId}`);
 		} catch (error) {
@@ -376,30 +406,72 @@
 	}
 
 	// Handle cancel
-	function handleCancel() {
+	async function handleCancel() {
 		// Clear any saved form data when cancelling
 		localStorage.removeItem(`jaces_oauth_form_${data.source.name}`);
+		// Invalidate sources data to ensure fresh data when navigating back
+		await invalidate('app:sources');
 		goto("/data/sources");
 	}
 
-	// Generate a new device token
-	function generateDeviceToken() {
-		// Generate a secure random token (8 bytes = 16 hex chars)
-		const array = new Uint8Array(8);
-		crypto.getRandomValues(array);
-		const token = Array.from(array, (byte) =>
-			byte.toString(16).padStart(2, "0"),
-		).join("");
-		generatedToken = `dev_tk_${token}`;
-
-		// Reset connection status
-		deviceConnected = false;
-		if (connectionCheckInterval) {
-			clearInterval(connectionCheckInterval);
+	// Generate a new device token and save it immediately
+	async function generateDeviceToken() {
+		// Validate that instance name is provided
+		if (!instanceName.trim()) {
+			errorMessage = "Please enter a name for this connection first";
+			return;
 		}
 
-		// Start checking for device connection every 2 seconds
-		startConnectionCheck();
+		try {
+			// Create the device source immediately with the token
+			const response = await fetch("/api/sources/device-token", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					sourceName: data.source.name,
+					instanceName: instanceName.trim(),
+					description: connectionDescription
+				}),
+			});
+
+			const result = await response.json();
+
+			if (!response.ok || !result.success) {
+				throw new Error(result.error || "Failed to generate device token");
+			}
+
+			// Store the generated token and source ID
+			generatedToken = result.deviceToken;
+			data.source.existingSource = {
+				id: result.source.id,
+				instanceName: result.source.instanceName,
+				status: result.source.status
+			};
+
+			// Reset connection status
+			deviceConnected = false;
+			if (connectionCheckInterval) {
+				clearInterval(connectionCheckInterval);
+			}
+
+			// Start checking for device connection every 2 seconds
+			startConnectionCheck();
+
+			// Show success toast
+			toast.success("Device token generated", {
+				description: "Token is ready to use in your device app"
+			});
+		} catch (error) {
+			console.error("Failed to generate device token:", error);
+			errorMessage = error instanceof Error ? error.message : "Failed to generate device token";
+			
+			// Show error toast
+			toast.error("Failed to generate token", {
+				description: errorMessage
+			});
+		}
 	}
 
 	// Check if device has connected with the token
@@ -558,10 +630,10 @@
 							{#if data.source.isConnected && !data.source.connectionSuccessful}
 								<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
 									<p class="text-sm text-blue-700">
-										<strong>Status:</strong> Already connected
+										<strong>Note:</strong> {data.source.connectionCount || 1} {data.source.displayName} {data.source.connectionCount === 1 ? 'account is' : 'accounts are'} already connected
 									</p>
 									<p class="text-xs text-blue-600 mt-1">
-										You can reconnect to update permissions or continue to stream configuration.
+										You can add another account or reconnect an existing one to update permissions.
 									</p>
 								</div>
 							{:else if !data.source.isConnected}
@@ -615,7 +687,7 @@
 							{/if}
 
 							<Button
-								text={data.source.isConnected ? "Reconnect with " + data.source.company : "Connect with " + data.source.company}
+								text={data.source.isConnected ? "Add Another " + data.source.displayName + " Account" : "Connect with " + data.source.company}
 								variant={data.source.isConnected ? "outline" : "filled"}
 								onclick={handleOAuthConnect}
 								disabled={isSubmitting}
@@ -822,7 +894,7 @@
 													class="mt-4 space-y-6"
 												>
 													<!-- Initial sync configuration -->
-													{#if stream.syncType !== 'token'}
+													{#if stream.supportsInitialSync}
 														<div
 															class="border-t border-neutral-200 pt-4"
 														>
@@ -913,7 +985,7 @@
 															/>
 															</div>
 														</div>
-													{:else}
+													{:else if stream.syncType === 'token'}
 														<!-- Token-based sync info -->
 														<div class="border-t border-neutral-200 pt-4">
 															<div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -923,71 +995,81 @@
 																</p>
 															</div>
 														</div>
+													{:else if stream.syncType === 'none'}
+														<!-- Real-time only sync info -->
+														<div class="border-t border-neutral-200 pt-4">
+															<p class="text-sm text-neutral-600">
+																This stream only supports real-time data collection. 
+																Historical data cannot be synced.
+															</p>
+														</div>
 													{/if}
 
 													<!-- Incremental sync configuration -->
-													<div
-														class="border-t border-neutral-200 pt-4"
-													>
-														<h4
-															class="text-sm font-medium text-neutral-700 mb-3"
+													{#if stream.syncType !== 'none'}
+														<div
+															class="border-t border-neutral-200 pt-4"
 														>
-															Incremental Sync
-														</h4>
-														<div>
-															<label
-																for="stream-{index}-cron"
-																class="block text-sm font-medium text-neutral-700 mb-1"
+															<h4
+																class="text-sm font-medium text-neutral-700 mb-3"
 															>
-																Sync Schedule
-																(Cron
-																Expression)
-															</label>
-															<div
-																class="relative"
-															>
-																<Input
-																	id="stream-{index}-cron"
-																	type="text"
-																	bind:value={
-																		stream.syncSchedule
-																	}
-																	oninput={(
-																		e,
-																	) => {
-																		const target =
-																			e.currentTarget as HTMLInputElement;
-																		updateSyncSchedule(
-																			index,
-																			target.value,
-																		);
-																	}}
-																	placeholder="0 * * * *"
-																	class={!stream.cronValid
-																		? "border-red-500"
-																		: ""}
-																/>
-																{#if stream.cronValid === false}
-																	<p
-																		class="text-sm text-red-500 mt-1"
-																	>
-																		Invalid
-																		cron
-																		expression
-																	</p>
-																{:else}
-																	<p
-																		class="text-sm text-neutral-500 mt-1"
-																	>
-																		{stream.ingestionType ===
-																		"push"
-																			? "How often device should upload data"
-																			: "How often to fetch new data"}
-																	</p>
-																{/if}
+																Incremental Sync
+															</h4>
+															<div>
+																<label
+																	for="stream-{index}-cron"
+																	class="block text-sm font-medium text-neutral-700 mb-1"
+																>
+																	Sync Schedule
+																	(Cron
+																	Expression)
+																</label>
+																<div
+																	class="relative"
+																>
+																	<Input
+																		id="stream-{index}-cron"
+																		type="text"
+																		bind:value={
+																			stream.syncSchedule
+																		}
+																		oninput={(
+																			e,
+																		) => {
+																			const target =
+																				e.currentTarget as HTMLInputElement;
+																			updateSyncSchedule(
+																				index,
+																				target.value,
+																			);
+																		}}
+																		placeholder="0 * * * *"
+																		class={!stream.cronValid
+																			? "border-red-500"
+																			: ""}
+																	/>
+																	{#if stream.cronValid === false}
+																		<p
+																			class="text-sm text-red-500 mt-1"
+																		>
+																			Invalid
+																			cron
+																			expression
+																		</p>
+																	{:else}
+																		<p
+																			class="text-sm text-neutral-500 mt-1"
+																		>
+																			{stream.ingestionType ===
+																			"push"
+																				? "How often device should upload data"
+																				: "How often to fetch new data"}
+																		</p>
+																	{/if}
+																</div>
 															</div>
 														</div>
-													</div>
+													{/if}
 												</div>
 											{/if}
 										</div>
@@ -1010,10 +1092,15 @@
 
 				{#if data.source.authType === "device_token"}
 					<Button
-						text="Save Configuration"
+						text={deviceConnected ? "Save & Start Syncing" : "Configure Streams"}
 						variant="filled"
 						onclick={handleDeviceSubmit}
 						disabled={isSubmitting || !generatedToken}
+						title={!generatedToken 
+							? "Generate a device token first" 
+							: !deviceConnected
+								? "Configure which streams to sync"
+								: "Save stream configuration and start syncing"}
 					/>
 				{:else if data.source.authType === "oauth2"}
 					<Button

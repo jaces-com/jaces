@@ -71,7 +71,6 @@ def process_stream_generic(
                 SELECT signal_name, id 
                 FROM signal_configs 
                 WHERE signal_name = ANY(:signal_names)
-                AND status = 'active'
             """),
             {
                 "signal_names": produces_signals
@@ -90,11 +89,11 @@ def process_stream_generic(
     # Assuming naming convention: StreamProcessor suffix
     module = importlib.import_module(module_path)
     
-    # Find the processor class - look for classes ending with 'StreamProcessor'
+    # Find the processor class - look for the StreamProcessor class
     processor_class = None
     for item_name in dir(module):
         item = getattr(module, item_name)
-        if isinstance(item, type) and item_name.endswith('StreamProcessor'):
+        if isinstance(item, type) and item_name == 'StreamProcessor':
             processor_class = item
             break
     
@@ -124,15 +123,6 @@ def process_stream_batch(
         pipeline_activity_id: ID of the pipeline activity from ingestion
         stream_id: ID of the stream configuration
     """
-    
-    # TEMPORARILY DISABLED: Processing/normalization after MinIO storage
-    print(f"[DISABLED] Skipping processing for stream {stream_name} - Processing temporarily disabled")
-    return {
-        'status': 'skipped',
-        'reason': 'Processing temporarily disabled',
-        'stream_name': stream_name,
-        'stream_key': stream_key
-    }
     
     db = Session()
     signal_creation_id = None
@@ -216,6 +206,24 @@ def process_stream_batch(
         )
         
         db.commit()
+        
+        # Chain transition detection after successful signal creation
+        from celery import signature
+        
+        # Get today's date for transition detection
+        # TODO: In the future, get actual user_id from the pipeline context
+        user_id = "00000000-0000-0000-0000-000000000001"  # Default user for now
+        date = datetime.now(tz.utc).strftime('%Y-%m-%d')
+        
+        # Queue transition detection for the signals just created
+        transition_task = signature(
+            'start_transition_detection',
+            args=[user_id, date, 'automatic'],
+            queue='celery'
+        )
+        task_result = transition_task.apply_async()
+        print(f"Queued transition detection task: {task_result.id}")
+        
         return result
         
     except Exception as e:

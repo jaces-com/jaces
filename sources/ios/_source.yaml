@@ -16,9 +16,6 @@ auth:
     - device_id
     - device_name
     - os_version
-  pairing:
-    code_length: 6
-    timeout_seconds: 300
 
 # Available streams
 streams:

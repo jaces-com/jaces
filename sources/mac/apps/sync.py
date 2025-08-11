@@ -17,13 +17,13 @@ class MacAppsSync:
     
     requires_credentials = False  # This source uses device tokens
     
-    def __init__(self, signal: Signals = None):
-        # This is a push-based source, signal details come from the signal
-        self.signal = signal
+    def __init__(self, stream: Signals = None):
+        # This is a push-based source, stream details come from the stream
+        self.stream = stream
         # Normalizer removed - using stream processors
         # self.normalizer = MacAppsNormalizer(
-        #     fidelity_score=signal.fidelity_score if signal else 0.95,
-        #     insider_tip=signal.description if signal else None
+        #     fidelity_score=stream.fidelity_score if stream else 0.95,
+        #     insider_tip=stream.description if stream else None
         # )
     
     async def sync(self) -> Dict[str, Any]:
@@ -42,7 +42,7 @@ class MacAppsSync:
             "message": "Mac apps is a push-based source. Data is received via the ingestion endpoint.",
             "records_synced": 0,
             "source": "mac",
-            "signal_id": str(self.signal.id) if self.signal and hasattr(self.signal, 'id') else None,
+            "stream_id": str(self.stream.id) if self.stream and hasattr(self.stream, 'id') else None,
             "is_push_based": True
         }
     
@@ -56,15 +56,15 @@ class MacAppsSync:
             Test result dictionary
         """
         # For push-based sources, we don't have device tokens anymore
-        # Just check if signal exists
-        if not self.signal:
+        # Just check if stream exists
+        if not self.stream:
             return {
                 "success": False,
-                "error": "No signal configured"
+                "error": "No stream configured"
             }
         
         # Check if we've received data recently
-        last_ingestion = self.signal.last_successful_ingestion_at if self.signal else None
+        last_ingestion = self.stream.last_successful_ingestion_at if self.stream else None
         if last_ingestion:
             time_since = datetime.utcnow() - last_ingestion
             hours_since = time_since.total_seconds() / 3600
@@ -86,5 +86,5 @@ class MacAppsSync:
             "success": True,
             "status": status,
             "message": message,
-            "signal_name": self.signal.name if self.signal else None
+            "stream_name": self.stream.name if self.stream else None
         }

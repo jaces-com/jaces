@@ -38,7 +38,10 @@ struct OnboardingView: View {
                             deviceToken: $deviceToken,
                             isVerifying: $isVerifying,
                             errorMessage: $errorMessage,
-                            onNext: verifyConfiguration
+                            configurationState: $deviceManager.configurationState,
+                            configuredStreamCount: $deviceManager.configuredStreamCount,
+                            onNext: verifyConfiguration,
+                            onRefresh: checkConfigurationStatus
                         )
                     case 2:
                         PermissionsStep(
@@ -88,10 +91,42 @@ struct OnboardingView: View {
                 isVerifying = false
                 
                 if success {
+                    // Check if configuration is complete
+                    if deviceManager.configurationState == .fullyConfigured {
+                        // Streams are configured, move to permissions
+                        withAnimation {
+                            currentStep = 2
+                        }
+                    } else if deviceManager.configurationState == .tokenValid {
+                        // Token valid but waiting for streams
+                        // Stay on current step but show waiting UI
+                        errorMessage = nil
+                    }
+                } else {
+                    errorMessage = deviceManager.lastError
+                }
+            }
+        }
+    }
+    
+    private func checkConfigurationStatus() {
+        Task {
+            await MainActor.run {
+                isVerifying = true
+            }
+            
+            // Re-verify to check if streams are now configured
+            let success = await deviceManager.verifyConfiguration()
+            
+            await MainActor.run {
+                isVerifying = false
+                
+                if success && deviceManager.configurationState == .fullyConfigured {
+                    // Configuration is complete, move to permissions
                     withAnimation {
                         currentStep = 2
                     }
-                } else {
+                } else if !success {
                     errorMessage = deviceManager.lastError
                 }
             }
@@ -109,6 +144,19 @@ struct OnboardingView: View {
     
     private func performInitialSync() {
         Task {
+            // Upload batches as they're saved
+            let uploadTask = Task {
+                // Give initial sync a moment to start saving batches
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                
+                // Keep uploading while initial sync is running
+                while healthKitManager.isSyncing {
+                    print("🚀 Uploading batches during initial sync")
+                    await BatchUploadCoordinator.shared.performUpload()
+                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds between uploads
+                }
+            }
+            
             let success = await healthKitManager.performInitialSync { progress in
                 Task { @MainActor in
                     withAnimation {
@@ -117,15 +165,22 @@ struct OnboardingView: View {
                 }
             }
             
+            // Cancel upload task if still running
+            uploadTask.cancel()
+            
             if success {
                 print("✅ Initial sync completed successfully")
                 
-                // Start the upload coordinator (handles all background syncing)
-                BatchUploadCoordinator.shared.startPeriodicUploads()
-                
-                // Trigger immediate upload of the initial sync data
-                print("🚀 Triggering upload after initial sync")
+                // Final upload to ensure everything is sent
+                print("🚀 Final upload after initial sync")
                 await BatchUploadCoordinator.shared.performUpload()
+                
+                // Now start regular monitoring (AFTER initial sync is done)
+                print("🏥 Starting regular HealthKit monitoring")
+                healthKitManager.startMonitoring()
+                
+                // Start the upload coordinator for background syncing
+                BatchUploadCoordinator.shared.startPeriodicUploads()
                 
                 // Small delay for UI
                 try? await Task.sleep(nanoseconds: 500_000_000)
@@ -177,13 +232,17 @@ struct EndpointConfigurationStep: View {
     @Binding var deviceToken: String
     @Binding var isVerifying: Bool
     @Binding var errorMessage: String?
+    @Binding var configurationState: DeviceConfigurationState
+    @Binding var configuredStreamCount: Int
     let onNext: () -> Void
+    let onRefresh: () -> Void
     
     @State private var showTokenHelp = false
+    @State private var refreshTimer: Timer?
     
     var isValid: Bool {
         !apiEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        deviceToken.hasPrefix("dev_tk_") && deviceToken.count > 10
+        deviceToken.count >= 6
     }
     
     var body: some View {
@@ -200,7 +259,15 @@ struct EndpointConfigurationStep: View {
                         .font(.headline)
                     
                     TextField("https://your-server.com", text: $apiEndpoint)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(.system(size: 17))
+                        .padding()
+                        .frame(minHeight: 52)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color(.systemGray4), lineWidth: 0.5)
+                        )
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
                         .keyboardType(.URL)
@@ -222,14 +289,25 @@ struct EndpointConfigurationStep: View {
                         }
                     }
                     
-                    TextField("dev_tk_...", text: $deviceToken)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .autocapitalization(.none)
+                    TextField("A7K2P9X4", text: $deviceToken)
+                        .font(.system(size: 20, weight: .medium, design: .monospaced))
+                        .padding()
+                        .frame(minHeight: 52)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color(.systemGray4), lineWidth: 0.5)
+                        )
+                        .autocapitalization(.allCharacters)  // Auto-uppercase all input
                         .disableAutocorrection(true)
-                        .font(.system(.body, design: .monospaced))
+                        .onChange(of: deviceToken) { oldValue, newValue in
+                            // Ensure token is always uppercase
+                            deviceToken = newValue.uppercased()
+                        }
                     
                     if showTokenHelp {
-                        Text("Generate a device token in the web app when adding this iOS device as a data source. The token should start with 'dev_tk_'.")
+                        Text("Generate a device token in the web app when adding this iOS device as a data source.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .padding(.vertical, 4)
@@ -255,30 +333,108 @@ struct EndpointConfigurationStep: View {
                 .padding(.horizontal)
             }
             
-            // Verify button
-            Button(action: onNext) {
-                HStack {
-                    if isVerifying {
+            // Show different UI based on configuration state
+            if configurationState == .tokenValid {
+                // Token is valid but waiting for stream configuration
+                VStack(spacing: 16) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Token Verified")
+                            .font(.headline)
+                            .foregroundColor(.green)
+                    }
+                    .padding(.horizontal)
+                    
+                    VStack(spacing: 8) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(0.8)
-                    } else {
-                        Text("Verify Connection")
-                        Image(systemName: "arrow.right")
+                        
+                        Text("Waiting for stream configuration")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Please complete the configuration in your web browser")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
+                    .padding()
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                    
+                    Button(action: onRefresh) {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Check Configuration Status")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isVerifying)
+                    .padding(.horizontal)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(isValid ? Color.accentColor : Color.gray.opacity(0.3))
-                .foregroundColor(.white)
-                .cornerRadius(12)
+            } else {
+                // Normal verify button
+                Button(action: onNext) {
+                    HStack {
+                        if isVerifying {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(0.8)
+                        } else {
+                            Text("Verify Connection")
+                            Image(systemName: "arrow.right")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isValid ? Color.accentColor : Color.gray.opacity(0.3))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                }
+                .disabled(!isValid || isVerifying)
+                .padding(.horizontal)
             }
-            .disabled(!isValid || isVerifying)
-            .padding(.horizontal)
             
             Spacer()
         }
         .padding(.top)
+        .onAppear {
+            // Start auto-refresh timer if waiting for configuration
+            if configurationState == .tokenValid {
+                startRefreshTimer()
+            }
+        }
+        .onDisappear {
+            stopRefreshTimer()
+        }
+        .onChange(of: configurationState) { newState in
+            if newState == .tokenValid {
+                startRefreshTimer()
+            } else {
+                stopRefreshTimer()
+            }
+        }
+    }
+    
+    private func startRefreshTimer() {
+        stopRefreshTimer()
+        // Auto-check every 5 seconds
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            if !isVerifying {
+                onRefresh()
+            }
+        }
+    }
+    
+    private func stopRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 }
 
@@ -466,6 +622,7 @@ struct PermissionRow: View {
 struct InitialSyncStep: View {
     @Binding var syncProgress: Double
     let onComplete: () -> Void
+    @StateObject private var deviceManager = DeviceManager.shared
     
     var progressPercentage: Int {
         Int(syncProgress * 100)
@@ -475,13 +632,17 @@ struct InitialSyncStep: View {
         syncProgress >= 1.0
     }
     
+    var syncDays: Int {
+        deviceManager.configuration.getInitialSyncDays(for: "healthkit")
+    }
+    
     var body: some View {
         VStack(spacing: 32) {
             Text("Syncing Health Data")
                 .font(.title2)
                 .bold()
             
-            Text(isComplete ? "Sync complete! Ready to start tracking." : "Fetching the last 7 days of health data...")
+            Text(isComplete ? "Sync complete! Ready to start tracking." : "Fetching the last \(syncDays) days of health data...")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)

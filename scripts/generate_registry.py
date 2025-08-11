@@ -51,8 +51,8 @@ def walk_sources_directory() -> Dict[str, Any]:
                 'company': source_config.get('company', ''),
                 'platform': source_config.get('platform', 'cloud'),
                 'icon': source_config.get('icon', ''),
-                'auth': source_config.get('auth', {}),  # Preserve auth config
-                'oauth': source_config.get('oauth', {}),  # Preserve oauth config
+                'video': source_config.get('video', ''),  # Include video field
+                'auth': source_config.get('auth', {}),  # All auth config including OAuth settings
                 'sync': source_config.get('sync', {}),  # Preserve sync config
                 'requirements': source_config.get('requirements', {}),  # Preserve requirements
                 'streams': [],
@@ -84,6 +84,7 @@ def walk_sources_directory() -> Dict[str, Any]:
                         'display_name': stream_config.get('display_name', stream_name),
                         'description': stream_config.get('description', ''),
                         'processor': f"sources.{source_dir.name}.{stream_dir.name}.stream_processor",
+                        'processor_config': stream_config.get('processor', {}),  # Include processor configuration
                         'output_type': output_type,
                         'ingestion': stream_config.get('ingestion', {}),
                         'sync': stream_config.get('sync', {}),
@@ -169,10 +170,15 @@ def walk_sources_directory() -> Dict[str, Any]:
                                     registry['signals'][signal_name]['detector'] = detector_module
 
                                     # Add to transition detectors (for signal_analysis.py)
-                                    # Assumes detector class follows naming convention
-                                    class_name = ''.join(
-                                        word.capitalize() for word in signal_dir.name.split('_'))
-                                    class_name = f"{class_name}TransitionDetector"
+                                    # Check if YAML specifies detector class name, otherwise generate it
+                                    if signal_config.get('detector'):
+                                        class_name = signal_config['detector']
+                                    else:
+                                        # Assumes detector class follows naming convention
+                                        class_name = ''.join(
+                                            word.capitalize() for word in signal_dir.name.split('_'))
+                                        class_name = f"{class_name}TransitionDetector"
+                                    
                                     registry['transition_detectors'][signal_name] = {
                                         'module': detector_module,
                                         'class': class_name

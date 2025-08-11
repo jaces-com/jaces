@@ -75,7 +75,7 @@ class BatchUploadCoordinator: ObservableObject {
     
     func performUpload() async {
         print("🚀 Starting upload process...")
-        print("   Device paired: \(deviceManager.isPaired)")
+        print("   Device configured: \(deviceManager.isConfigured)")
         print("   Device token: \(deviceManager.configuration.deviceToken.isEmpty ? "(empty)" : "(set)")")
         print("   API endpoint: \(deviceManager.configuration.apiEndpoint)")
         
@@ -91,7 +91,7 @@ class BatchUploadCoordinator: ObservableObject {
         // Clean up any bad events first
         _ = sqliteManager.cleanupBadEvents()
         
-        guard deviceManager.isPaired else {
+        guard deviceManager.isConfigured else {
             print("❌ Device not paired, skipping upload")
             return
         }
@@ -166,7 +166,7 @@ class BatchUploadCoordinator: ObservableObject {
             
             // Decode and combine data based on stream type
             switch streamName {
-            case "apple_ios_healthkit":
+            case "ios_healthkit":
                 var allMetrics: [HealthKitMetric] = []
                 
                 // Decode each event and collect all metrics
@@ -205,7 +205,7 @@ class BatchUploadCoordinator: ObservableObject {
                     return false
                 }
                 
-            case "apple_ios_core_location":
+            case "ios_location":
                 var allLocations: [LocationData] = []
                 
                 // Decode each event and collect all locations
@@ -244,7 +244,7 @@ class BatchUploadCoordinator: ObservableObject {
                     return false
                 }
                 
-            case "apple_ios_mic_audio":
+            case "ios_mic":
                 var allChunks: [AudioChunk] = []
                 
                 // Decode each event and collect all chunks
@@ -441,7 +441,7 @@ class BatchUploadCoordinator: ObservableObject {
     // MARK: - Network Monitoring
     
     func handleNetworkChange(isConnected: Bool) {
-        if isConnected && deviceManager.isPaired {
+        if isConnected && deviceManager.isConfigured {
             // Network restored, trigger upload
             Task {
                 await performUpload()

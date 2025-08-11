@@ -118,7 +118,21 @@ class NetworkManager: ObservableObject {
     
     // MARK: - Device Verification
     
-    func verifyDeviceToken(endpoint: URL, deviceToken: String, deviceInfo: [String: Any]) async -> Bool {
+    struct StreamConfiguration {
+        let enabled: Bool
+        let initialSyncDays: Int
+        let displayName: String
+    }
+    
+    struct VerificationResponse {
+        let success: Bool
+        let configurationComplete: Bool
+        let message: String?
+        let configuredStreamCount: Int
+        let streamConfigurations: [String: StreamConfiguration]
+    }
+    
+    func verifyDeviceToken(endpoint: URL, deviceToken: String, deviceInfo: [String: Any]) async -> VerificationResponse {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -133,42 +147,87 @@ class NetworkManager: ObservableObject {
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 lastError = .unknown(NSError(domain: "Invalid response", code: 0))
-                return false
+                return VerificationResponse(success: false, configurationComplete: false, message: nil, configuredStreamCount: 0, streamConfigurations: [:])
             }
             
             switch httpResponse.statusCode {
             case 200...299:
-                // Parse response to confirm success
+                // Parse response to get success and configuration status
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let success = json["success"] as? Bool {
-                    return success
+                    let configurationComplete = json["configurationComplete"] as? Bool ?? false
+                    let message = json["message"] as? String
+                    let configuredStreamCount = json["configuredStreamCount"] as? Int ?? 0
+                    
+                    // Parse stream configurations
+                    var streamConfigs: [String: StreamConfiguration] = [:]
+                    if let configuration = json["configuration"] as? [String: Any],
+                       let streams = configuration["streams"] as? [String: Any] {
+                        for (streamKey, streamData) in streams {
+                            if let stream = streamData as? [String: Any],
+                               let enabled = stream["enabled"] as? Bool,
+                               let initialSyncDays = stream["initialSyncDays"] as? Int,
+                               let displayName = stream["displayName"] as? String {
+                                streamConfigs[streamKey] = StreamConfiguration(
+                                    enabled: enabled,
+                                    initialSyncDays: initialSyncDays,
+                                    displayName: displayName
+                                )
+                            }
+                        }
+                    }
+                    
+                    print("✅ Verification response:")
+                    print("   Success: \(success)")
+                    print("   Configuration complete: \(configurationComplete)")
+                    print("   Configured streams: \(configuredStreamCount)")
+                    print("   Stream configs: \(streamConfigs.keys.joined(separator: ", "))")
+                    for (key, config) in streamConfigs {
+                        print("     - \(key): enabled=\(config.enabled), initialSyncDays=\(config.initialSyncDays)")
+                    }
+                    print("   Message: \(message ?? "none")")
+                    
+                    return VerificationResponse(
+                        success: success,
+                        configurationComplete: configurationComplete,
+                        message: message,
+                        configuredStreamCount: configuredStreamCount,
+                        streamConfigurations: streamConfigs
+                    )
                 }
-                return true
+                return VerificationResponse(success: true, configurationComplete: false, message: nil, configuredStreamCount: 0, streamConfigurations: [:])
             case 401:
                 lastError = .invalidToken
-                return false
+                return VerificationResponse(success: false, configurationComplete: false, message: "Invalid token", configuredStreamCount: 0, streamConfigurations: [:])
             case 404:
                 // Token not found in database
                 lastError = .unknown(NSError(domain: "Device token not found. Please generate a new token in the web app.", code: 404))
-                return false
+                return VerificationResponse(success: false, configurationComplete: false, message: "Token not found", configuredStreamCount: 0, streamConfigurations: [:])
             default:
                 lastError = .serverError(httpResponse.statusCode)
-                return false
+                return VerificationResponse(success: false, configurationComplete: false, message: "Server error", configuredStreamCount: 0, streamConfigurations: [:])
             }
         } catch {
+            print("❌ Network request failed: \(error)")
+            print("   URL: \(endpoint)")
+            
             if let urlError = error as? URLError {
                 switch urlError.code {
                 case .timedOut:
                     lastError = .timeout
                 case .notConnectedToInternet, .networkConnectionLost:
                     lastError = .noConnection
+                case .cannotConnectToHost:
+                    lastError = .unknown(NSError(domain: "Cannot connect to \(endpoint.absoluteString). Please check the URL and ensure the server is running.", code: urlError.code.rawValue))
+                case .cannotFindHost:
+                    lastError = .unknown(NSError(domain: "Cannot find host \(endpoint.host ?? ""). Please check the URL.", code: urlError.code.rawValue))
                 default:
                     lastError = .unknown(error)
                 }
             } else {
                 lastError = .unknown(error)
             }
-            return false
+            return VerificationResponse(success: false, configurationComplete: false, message: "Network error", configuredStreamCount: 0, streamConfigurations: [:])
         }
     }
     
@@ -199,7 +258,7 @@ class NetworkManager: ObservableObject {
 
 struct UploadResponse: Codable {
     let success: Bool
-    let taskId: String
+    let taskId: String?  // Optional since Celery processing may be disabled
     let pipelineActivityId: String
     let dataSizeBytes: Int
     let dataSize: String

@@ -38,7 +38,7 @@ struct AudioChunk: Codable {
 }
 
 struct AudioStreamData: Codable {
-    let streamName: String = "apple_ios_mic_audio"
+    let streamName: String = "ios_mic"
     let deviceId: String
     let data: [AudioChunk]
     let batchMetadata: BatchMetadata

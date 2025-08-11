@@ -3,7 +3,10 @@ import { db } from '$lib/db/client';
 import { sourceConfigs, sources, signalConfigs } from '$lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ depends }) => {
+	// This allows us to invalidate this specific load function
+	depends('app:sources');
+	
 	try {
 		// Get all source configurations (templates)
 		const allSourceConfigs = await db
@@ -32,14 +35,20 @@ export const load: PageServerLoad = async () => {
 			// Get OAuth config
 			const oauthConfig = (sourceConfig.oauthConfig as any) || {};
 			
-			// For connected sources, get the most recent instance
-			const latestInstance = connectedInstances.sort((a, b) => 
+			// Sort instances by last update time
+			const sortedInstances = [...connectedInstances].sort((a, b) => 
 				(b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-			)[0];
+			);
+			
+			// For connected sources, get the most recent instance
+			const latestInstance = sortedInstances[0];
 			
 			// Check if OAuth needs reauth
 			const needsReauth = latestInstance?.oauthExpiresAt && 
 				new Date(latestInstance.oauthExpiresAt) < new Date();
+			
+			// Device sources support multiple connections
+			const supportsMultiple = sourceConfig.platform === 'device';
 
 			return {
 				id: latestInstance?.id, // Add the source instance ID for navigation
@@ -47,6 +56,7 @@ export const load: PageServerLoad = async () => {
 				display_name: sourceConfig.displayName || sourceConfig.name,
 				description: sourceConfig.description || "",
 				icon: sourceConfig.icon || "",
+				video: sourceConfig.video || null,
 				platform: sourceConfig.platform,
 				enabled: true,
 				auth_type: sourceConfig.authType,
@@ -65,8 +75,17 @@ export const load: PageServerLoad = async () => {
 				auth_proxy: oauthConfig.authProxy,
 				is_connected: isConnected,
 				connected_count: connectedInstances.length,
-				// Multiple connections support (for future use)
-				multiple_connections: false
+				// Multiple connections support for device sources
+				multiple_connections: supportsMultiple,
+				// Include all instances for device sources
+				instances: supportsMultiple ? sortedInstances.map(instance => ({
+					id: instance.id,
+					instanceName: instance.instanceName,
+					status: instance.status,
+					lastSyncAt: instance.lastSyncAt,
+					deviceType: instance.deviceType,
+					createdAt: instance.createdAt
+				})) : []
 			};
 		});
 		

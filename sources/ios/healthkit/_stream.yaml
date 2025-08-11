@@ -12,6 +12,12 @@ ingestion:
   batch_type: array
   raw_data_type: HKSample
   
+# Sync configuration
+sync:
+  type: date_range  # Supports historical data sync with lookback
+  initial_sync_days: 90  # Default lookback period for HealthKit data
+  schedule: "*/5 * * * *"  # Sync every 5 minutes for device uploads
+  
 # Signals produced by this stream
 signals:
   - heart_rate

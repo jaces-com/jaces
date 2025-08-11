@@ -40,7 +40,7 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    if deviceManager.isPaired {
+                    if deviceManager.isConfigured {
                         HStack {
                             Text("API Endpoint")
                             Spacer()

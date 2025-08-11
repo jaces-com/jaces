@@ -10,8 +10,6 @@ import httpx
 from .client import GoogleCalendarClient
 from sources.base.storage.minio import store_raw_data
 from sources.base.generated_models.signals import Signals
-from sources.base.generated_models.episodic_signals import EpisodicSignals
-from sources.base.storage.database import AsyncSessionLocal
 from sources.base.interfaces.sync import BaseSync
 
 
@@ -26,8 +24,7 @@ class GoogleCalendarSync(BaseSync):
         """Initialize the sync handler."""
         super().__init__(stream, access_token, token_refresher)
         self.client = GoogleCalendarClient(access_token, token_refresher)
-        # For backward compatibility, allow both 'stream' and 'signal' attribute names
-        self.signal = stream
+        self.stream = stream
     
     def get_full_sync_range(self) -> Tuple[datetime, datetime]:
         """
@@ -72,25 +69,22 @@ class GoogleCalendarSync(BaseSync):
             # List all calendars
             calendars = await self.client.list_calendars()
             
-            # Get selected calendar IDs from signal settings
+            # Get selected calendar IDs from stream settings
             selected_calendar_ids = None
-            if self.signal.settings and "calendar_ids" in self.signal.settings:
-                selected_calendar_ids = self.signal.settings["calendar_ids"]
+            if self.stream.settings and "calendar_ids" in self.stream.settings:
+                selected_calendar_ids = self.stream.settings["calendar_ids"]
                 print(f"Using selected calendars from settings: {selected_calendar_ids}")
 
             # Load existing sync tokens (stored as JSON dict per calendar)
             existing_sync_tokens = {}
-            if hasattr(self.signal, 'sync_token') and self.signal.sync_token:
+            if hasattr(self.stream, 'sync_token') and self.stream.sync_token:
                 try:
                     # Try to parse as JSON dict
-                    existing_sync_tokens = json.loads(self.signal.sync_token)
+                    existing_sync_tokens = json.loads(self.stream.sync_token)
                     print(f"Loaded sync tokens for {len(existing_sync_tokens)} calendars")
                 except (json.JSONDecodeError, TypeError):
-                    # Backward compatibility: might be a single token string
-                    print("Warning: sync_token is not valid JSON, treating as legacy single token")
-                    if self.signal.sync_token:
-                        # Use the single token for primary calendar only
-                        existing_sync_tokens = {"primary": self.signal.sync_token}
+                    print("Warning: sync_token is not valid JSON")
+                    existing_sync_tokens = {}
             
             # Store the new sync tokens we'll save at the end
             calendar_sync_tokens = {}  # Store new sync tokens per calendar
@@ -244,8 +238,8 @@ class GoogleCalendarSync(BaseSync):
             if hasattr(self, '_all_events') and self._all_events:
                 stream_data = {
                     "source": "google_calendar",
-                    "user_id": str(self.signal.user_id),
-                    "signal_id": str(self.signal.id),
+                    "user_id": str(self.stream.user_id),
+                    "stream_id": str(self.stream.id),
                     "events": self._all_events,
                     "batch_metadata": {
                         "total_events": len(self._all_events),
@@ -258,21 +252,34 @@ class GoogleCalendarSync(BaseSync):
                 # Store to stream
                 stream_key = await store_raw_data(
                     stream_name="google_calendar_events",
-                    connection_id=str(self.signal.id),
+                    connection_id=str(self.stream.id),
                     data=stream_data,
                     timestamp=datetime.now(timezone.utc)
                 )
                 
-                # Process the stream immediately
-                # In production, this would be queued via Celery
-                # For now, just pass - stream processing will be handled separately
+                # Queue stream processing via Celery
+                from sources.base.scheduler.celery_app import app
+                
+                # Queue the processing task
+                # Note: Using delay() for async task queueing
+                # IMPORTANT: Must pass stream_config_id, not stream.id due to FK constraint
+                task = app.send_task(
+                    'process_stream_batch',
+                    args=[
+                        'google_calendar',  # stream_name
+                        stream_key,         # MinIO key
+                        str(uuid4()),       # pipeline_activity_id (new one for processing)
+                        str(self.stream.stream_config_id) # stream_config_id (NOT stream.id!)
+                    ]
+                )
                 
                 stats["stream_key"] = stream_key
+                stats["processing_task_id"] = task.id
             
             stats["completed_at"] = datetime.now(timezone.utc)
             # Return sync tokens as JSON string dict
             stats["next_sync_token"] = json.dumps(all_sync_tokens) if all_sync_tokens else None
-            stats["is_initial_sync"] = self.signal.last_successful_ingestion_at is None if hasattr(self.signal, 'last_successful_ingestion_at') else True
+            stats["is_initial_sync"] = self.stream.last_successful_ingestion_at is None if hasattr(self.stream, 'last_successful_ingestion_at') else True
             
             print(f"Sync complete. Returning {len(all_sync_tokens)} sync tokens for next run")
 
@@ -284,87 +291,3 @@ class GoogleCalendarSync(BaseSync):
             raise
 
         return stats
-
-    async def _process_event(self, event: Dict[str, Any], calendar: Dict[str, Any]) -> None:
-        """Add event to batch for stream storage."""
-        # Events will be collected and stored as a batch
-        # Actual signal processing will happen in the stream processor
-        pass  # Events are collected in the main run() method
-
-
-    async def _persist_signal(self, signal: Dict[str, Any]) -> None:
-        """Persist episodic signal to database."""
-        async with AsyncSessionLocal() as db:
-            # Add user_id and signal_id to the signal
-            signal["user_id"] = str(self.signal.user_id)
-            signal["signal_id"] = str(self.signal.id)
-
-            # Parse timestamps with robust datetime handling
-            from datetime import timezone
-
-            # Parse start timestamp
-            start_timestamp_str = signal["start_timestamp"]
-            try:
-                # Handle 'Z' UTC suffix
-                if start_timestamp_str.endswith("Z"):
-                    start_timestamp_str = start_timestamp_str[:-1] + "+00:00"
-
-                start_timestamp = datetime.fromisoformat(start_timestamp_str)
-                # Ensure we have a timezone-aware datetime
-                if start_timestamp.tzinfo is None:
-                    start_timestamp = start_timestamp.replace(tzinfo=timezone.utc)
-            except Exception as e:
-                print(f"Warning: Could not parse start timestamp '{start_timestamp_str}': {e}, using current time")
-                start_timestamp = datetime.now(timezone.utc)
-
-            # Parse end timestamp
-            end_timestamp_str = signal["end_timestamp"]
-            try:
-                # Handle 'Z' UTC suffix
-                if end_timestamp_str.endswith("Z"):
-                    end_timestamp_str = end_timestamp_str[:-1] + "+00:00"
-
-                end_timestamp = datetime.fromisoformat(end_timestamp_str)
-                # Ensure we have a timezone-aware datetime
-                if end_timestamp.tzinfo is None:
-                    end_timestamp = end_timestamp.replace(tzinfo=timezone.utc)
-            except Exception as e:
-                print(f"Warning: Could not parse end timestamp '{end_timestamp_str}': {e}, using start time")
-                end_timestamp = start_timestamp
-
-            # Convert timezone-aware datetimes to naive UTC for database storage
-            if start_timestamp.tzinfo is not None:
-                start_timestamp = start_timestamp.astimezone(timezone.utc).replace(tzinfo=None)
-            if end_timestamp.tzinfo is not None:
-                end_timestamp = end_timestamp.astimezone(timezone.utc).replace(tzinfo=None)
-
-            # Create EpisodicSignal object directly from normalized signal
-            db_signal = EpisodicSignals(
-                id=signal["id"],
-                user_id=signal["user_id"],
-                signal_id=signal["signal_id"],
-                source_name=signal["source_name"],
-                start_timestamp=start_timestamp,
-                end_timestamp=end_timestamp,
-                summary=signal.get("summary", ""),
-                # ID arrays - these can be populated later with entity resolution
-                what_ids=signal.get("what_ids", []),
-                where_ids=signal.get("where_ids", []),
-                who_ids=signal.get("who_ids", []),
-                when_ids=signal.get("when_ids", []),
-                how_ids=signal.get("how_ids", []),
-                why_ids=signal.get("why_ids", []),
-                target_ids=signal.get("target_ids", []),
-                # Text arrays from the normalized signal
-                what_text=signal.get("what_text", []),
-                where_text=signal.get("where_text", []),
-                who_text=signal.get("who_text", []),
-                when_text=signal.get("when_text", []),
-                how_text=signal.get("how_text", []),
-                why_text=signal.get("why_text", []),
-                target_text=signal.get("target_text", []),
-                confidence=signal["confidence"]
-            )
-
-            db.add(db_signal)
-            await db.commit()

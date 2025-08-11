@@ -1,5 +1,5 @@
 version: 2.0.0
-generated_at: '2025-08-09T15:54:12.476850'
+generated_at: '2025-08-11T13:00:46.333201'
 sources:
   google:
     path: google/
@@ -8,13 +8,13 @@ sources:
     company: google
     platform: cloud
     icon: ri:google-fill
+    video: google2.webm
     auth:
       type: oauth2
       provider: google
       auth_url: https://accounts.google.com/o/oauth2/v2/auth
       token_url: https://oauth2.googleapis.com/token
       revoke_url: https://oauth2.googleapis.com/revoke
-    oauth:
       auth_proxy: https://auth.jaces.com/google/auth
       token_refresh_window: 300
     sync:
@@ -37,16 +37,13 @@ sources:
     company: apple
     platform: device
     icon: ri:smartphone-line
+    video: ios.webm
     auth:
       type: device_token
       required_fields:
       - device_id
       - device_name
       - os_version
-      pairing:
-        code_length: 6
-        timeout_seconds: 300
-    oauth: {}
     sync:
       batch_upload_interval: 300
       max_batch_size: 1000
@@ -85,12 +82,12 @@ sources:
     company: notion
     platform: cloud
     icon: ri:notion-fill
+    video: notion.webm
     auth:
       type: oauth2
       provider: notion
       auth_url: https://api.notion.com/v1/oauth/authorize
       token_url: https://api.notion.com/v1/oauth/token
-    oauth:
       auth_proxy: https://auth.jaces.com/notion/auth
       public_integration: true
       token_refresh_window: 0
@@ -113,6 +110,7 @@ sources:
     company: apple
     platform: device
     icon: ri:mac-line
+    video: mac2.webm
     auth:
       type: device_token
       required_fields:
@@ -120,7 +118,6 @@ sources:
       - device_name
       - os_version
       - hardware_model
-    oauth: {}
     sync:
       batch_upload_interval: 300
       max_batch_size: 500
@@ -152,6 +149,14 @@ streams:
     display_name: Google Calendar
     description: Calendar events and appointments
     processor: sources.google.calendar.stream_processor
+    processor_config:
+      class_name: StreamProcessor
+      source_name: google
+      stream_type: events
+      deduplication_strategy: multiple
+      event_id_fields:
+      - event_id
+      - calendar_id
     output_type: signals
     ingestion:
       type: pull
@@ -162,12 +167,6 @@ streams:
       type: token
     processing:
       normalization: true
-      validation:
-        required_fields:
-        - id
-        - summary
-        - start
-        - end
     storage: {}
     signals:
     - google_calendar_events
@@ -180,12 +179,16 @@ streams:
     display_name: iOS HealthKit
     description: Health data including heart rate, steps, workouts, sleep, and energy
     processor: sources.ios.healthkit.stream_processor
+    processor_config: {}
     output_type: signals
     ingestion:
       type: push
       batch_type: array
       raw_data_type: HKSample
-    sync: {}
+    sync:
+      type: date_range
+      initial_sync_days: 90
+      schedule: '*/5 * * * *'
     processing:
       deduplication:
         strategy: content_hash
@@ -226,15 +229,22 @@ streams:
     display_name: iOS Core Location
     description: Raw CoreLocation data including GPS, altitude, speed, and activity
     processor: sources.ios.location.stream_processor
+    processor_config:
+      class_name: StreamProcessor
+      source_name: ios
+      stream_type: array
+      deduplication_strategy: single
     output_type: signals
     ingestion:
       type: push
       batch_type: array
       raw_data_type: CLLocation
-    sync: {}
+    sync:
+      type: none
+      schedule: '*/5 * * * *'
     processing:
       deduplication:
-        strategy: timestamp
+        strategy: single
       normalization: true
       validation:
         required_fields:
@@ -269,13 +279,16 @@ streams:
     display_name: iOS Microphone Audio
     description: Audio chunks for transcription and analysis
     processor: sources.ios.mic.stream_processor
+    processor_config: {}
     output_type: signals
     ingestion:
       type: push
       batch_type: chunks
       raw_data_type: AudioChunk
       chunk_duration_ms: 5000
-    sync: {}
+    sync:
+      type: none
+      schedule: '*/5 * * * *'
     processing:
       deduplication: false
       normalization: true
@@ -303,6 +316,7 @@ streams:
     display_name: Notion Pages
     description: Pages and databases from Notion workspace
     processor: sources.notion.pages.stream_processor
+    processor_config: {}
     output_type: semantics
     ingestion:
       type: pull
@@ -340,6 +354,7 @@ streams:
     display_name: Mac Applications
     description: Application focus and usage events
     processor: sources.mac.apps.stream_processor
+    processor_config: {}
     output_type: signals
     ingestion:
       type: push
@@ -348,7 +363,7 @@ streams:
     sync: {}
     processing:
       deduplication:
-        strategy: timestamp
+        strategy: single
       normalization: true
       validation:
         required_fields:
@@ -376,38 +391,33 @@ signals:
     stream: google_calendar
     path: google/calendar/events/
     display_name: Calendar Events
-    description: Calendar event density and meeting patterns
+    description: Calendar events and meetings
     unit:
-      ucum: /h
-      display: events/hr
-      range:
-      - 0
-      - 10
-    value_type: continuous
-    algorithm: pelt
-    cost_function: l1
+      ucum: 1
+      display: event
+    value_type: event
+    algorithm: event_detection
+    cost_function: l2
     computation:
-      algorithm: pelt
-      cost_function: l1
+      algorithm: event_detection
       analysis_type: categorical
-      min_segment_size: 5
-      penalty_multiplier: 1.2
-      gap_threshold_seconds: 3600
+      value_type: event
     weight:
       macro: 0.7
       micro: 0.65
     transitions:
       min_gap_seconds: 1800
-      min_change: 2
-      confidence_threshold: 0.75
+      confidence_threshold: 0.85
     zones: {}
     metadata:
-      aggregation_window: 3600
-      include_all_day_events: false
-      include_declined: false
-      outlier_removal: false
+      event_types:
+      - meeting
+      - focus_time
+      - out_of_office
+      - appointment
+      - reminder
     schedule:
-      cron: 0 */2 * * *
+      cron: '*/15 * * * *'
       priority: medium
     detector: sources.google.calendar.events
   ios_active_energy:
@@ -845,7 +855,7 @@ semantics:
 transition_detectors:
   google_calendar_events:
     module: sources.google.calendar.events
-    class: EventsTransitionDetector
+    class: CalendarEventsTransitionDetector
   ios_active_energy:
     module: sources.ios.healthkit.active_energy
     class: ActiveEnergyTransitionDetector

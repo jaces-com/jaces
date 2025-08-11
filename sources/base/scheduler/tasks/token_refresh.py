@@ -153,7 +153,7 @@ def refresh_expiring_tokens():
                 WHERE s.oauth_expires_at IS NOT NULL
                 AND s.oauth_expires_at < :expiry_threshold
                 AND s.oauth_refresh_token IS NOT NULL
-                AND s.is_active = true
+                AND s.status IN ('authenticated', 'active')
             """),
             {"expiry_threshold": expiry_threshold}
         ).fetchall()

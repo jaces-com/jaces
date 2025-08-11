@@ -13,7 +13,7 @@
         className = "",
     } = $props<{
         href?: string | null;
-        variant?: "filled" | "outline" | "link" | "danger";
+        variant?: "filled" | "outline" | "link" | "danger" | "text";
         target?: "_blank" | "_self";
         text: string;
         type?: "button" | "submit" | "link";
@@ -30,6 +30,7 @@
     // Define variant classes as an object
     const variantStyles: Record<string, string> = {
         filled: "bg-neutral-800 text-white hover:bg-gradient-to-br hover:from-blue-700 hover:via-blue-600 hover:to-indigo-400",
+        text: "text-neutral-800 hover:text-neutral-900",
         outline:
             "border border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-800 hover:text-white after:text-white",
         danger: "border border-rose-300 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-400 after:text-rose-600",
@@ -37,9 +38,10 @@
 
     // Get the appropriate variant class
     const variantClasses = $derived(variantStyles[variant]);
-    
+
     // Add disabled state classes
-    const disabledClasses = "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none";
+    const disabledClasses =
+        "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none";
 
     // Merge classes, with variant styles taking priority over base classes
     const buttonClasses = $derived(

@@ -6,10 +6,9 @@ import { parseDate, toZoned, now } from '@internationalized/date';
 
 export const load: PageServerLoad = async ({ url, depends }) => {
 	// Register dependencies for granular invalidation
-	depends('signal-analysis:ambient-signals');
-	depends('signal-analysis:episodic-signals');
+	depends('signal-analysis:signals');
 	depends('signal-analysis:transitions');
-	depends('signal-analysis:boundaries');
+	depends('signal-analysis:events');
 
 	try {
 		// Default timezone - in a single-user system, this could be configured elsewhere
@@ -39,11 +38,11 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 		const startOfDay = zonedStart.toDate();
 		const endOfDay = zonedEnd.toDate();
 
-		// Query ambient signals for the day
-		const ambientData = await db
+		// Query all signals for the day with their configurations
+		const signalsData = await db
 			.select({
-				ambientSignal: signals,
-				signal: signalConfigs,
+				signal: signals,
+				config: signalConfigs,
 				source: sourceConfigs
 			})
 			.from(signals)
@@ -56,59 +55,60 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 				)
 			)
 			.orderBy(signals.timestamp);
+		
+		console.log(`Found ${signalsData.length} signals for ${dateParam || 'today'} between ${startOfDay.toISOString()} and ${endOfDay.toISOString()}`);
 
-		// Episodic signals are now stored in ambient_signals with event visualization type
-		const episodicData: any[] = [];
-
-		// Group ambient signals by sourceName + signalName to avoid duplicates
-		const ambientSignalsBySignalName = ambientData.reduce((acc, { ambientSignal, signal, source }) => {
-			// Skip old signal names that don't match the registered signal
-			if (ambientSignal.signalName !== signal.signalName) {
+		// Group signals by sourceName + signalName
+		const signalsByName = signalsData.reduce((acc, { signal, config, source }) => {
+			// Skip if signal names don't match (data integrity check)
+			if (signal.signalName !== config.signalName) {
 				return acc;
 			}
 
-			const groupKey = `${ambientSignal.sourceName}_${ambientSignal.signalName}`;
+			const groupKey = `${signal.sourceName}_${signal.signalName}`;
 			if (!acc[groupKey]) {
-				const wizardConfig = source.wizardConfig as any;
+				// Extract visualization type from computation JSON
+				const computation = config.computation as any;
+				const visualizationType = computation?.value_type || 'continuous';
+				
+				// Use the streamName directly from the config
+				const streamName = config.streamName;
+				
 				acc[groupKey] = {
-					signalName: ambientSignal.signalName,
-					displayName: signal.displayName,
-					sourceName: ambientSignal.sourceName,
-					signalId: signal.signalName,
-					visualizationType: signal.computation?.value_type || 'continuous',
-					unit: signal.unitUcum,
-					type: 'ambient' as const,
+					signalName: signal.signalName,
+					displayName: config.displayName,
+					sourceName: signal.sourceName,
+					streamName,
+					signalId: config.signalName,
+					visualizationType,
+					unit: config.unitUcum,
 					signals: []
 				};
 			}
 
 			acc[groupKey].signals.push({
-				id: ambientSignal.id,
-				timestamp: ambientSignal.timestamp,
-				signalName: ambientSignal.signalName,
-				signalValue: ambientSignal.signalValue,
-				coordinates: ambientSignal.coordinates,
-				confidence: ambientSignal.confidence,
-				sourceEventId: ambientSignal.sourceEventId,
-				// Add signal metadata
-				signalType: signal.computation?.value_type || 'continuous',
-				unit: signal.unitUcum
+				id: signal.id,
+				timestamp: signal.timestamp,
+				signalName: signal.signalName,
+				signalValue: signal.signalValue,
+				coordinates: signal.coordinates,
+				confidence: signal.confidence,
+				sourceEventId: signal.sourceEventId,
+				sourceMetadata: signal.sourceMetadata,
+				unit: config.unitUcum
 			});
 
 			return acc;
 		}, {} as Record<string, any>);
 
-		// Episodic signals no longer exist as a separate table
-		const episodicSignalsBySignalId = {} as Record<string, any>;
-
 		// Query for signal statistics to show contributing signals
+		// Note: We use MAX for the JSON field extraction to avoid GROUP BY issues
 		const signalStats = await db
 			.select({
 				sourceName: signalConfigs.sourceName,
 				signalId: signalConfigs.signalName,
-				signalType: sql<string>`${signalConfigs.computation}->>'value_type'`,
+				signalType: sql<string>`MAX(${signalConfigs.computation}->>'value_type')`,
 				displayName: signalConfigs.displayName,
-				type: sql<string>`CASE WHEN ${signalConfigs.computation}->>'value_type' = 'event' THEN 'episodic' ELSE 'ambient' END`,
 				eventCount: sql<number>`COUNT(DISTINCT ${signals.id})`,
 			})
 			.from(signalConfigs)
@@ -121,7 +121,7 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 					lte(signals.timestamp, endOfDay)
 				)
 			)
-			.groupBy(signalConfigs.sourceName, signalConfigs.signalName, signalConfigs.computation, signalConfigs.displayName);
+			.groupBy(signalConfigs.sourceName, signalConfigs.signalName, signalConfigs.displayName);
 
 		// Calculate coverage percentage for each signal
 		const contributingSignals = signalStats
@@ -132,127 +132,7 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 				coverage: Math.min(100, Math.round((stat.eventCount / 288) * 100)) // 288 = 24 hours * 12 (5-min intervals)
 			}));
 
-		// Boundary detection removed - focusing on transitions
-		const boundaryEvents: any[] = [];
-		
-		// Original boundary detection code commented out:
-		/*
-		const consolidatedBoundaryResults = await db
-			.select()
-			.from(boundaryDetections)
-			.where(
-				and(
-					eq(boundaryDetections.userId, userId),
-					lte(boundaryDetections.startTime, endOfDay),
-					gte(boundaryDetections.endTime, startOfDay),
-					// Only show consolidated boundaries at the top
-					sql`${boundaryDetections.boundaryScope} IN ('multi_signal', 'all_signals')`
-				)
-			)
-			.orderBy(boundaryDetections.startTime);
-
-		// Format consolidated boundary events for the UI
-		const boundaryEvents = consolidatedBoundaryResults.map(boundary => ({
-			id: boundary.id,
-			startTime: boundary.startTime.toISOString(),
-			endTime: boundary.endTime.toISOString(),
-			confidence: boundary.confidence,
-			contributingSources: boundary.contributingSources,
-			detectionMethod: boundary.detectionMethod,
-			boundaryScope: boundary.boundaryScope,
-			sourceSignal: boundary.sourceSignal ?? undefined
-		}));
-		*/
-
-		// Initialize empty signalBoundariesBySource for compatibility
-		const signalBoundariesBySource: Record<string, any[]> = {};
-
-		/* Commented out single signal boundaries
-		// Query single-signal boundaries grouped by source signal
-		// These show up in the individual signals section as "COMPUTED EVENTS"
-		const singleSignalBoundaries = await db
-			.select()
-			.from(boundaryDetections)
-			.where(
-				and(
-					eq(boundaryDetections.userId, userId),
-					lte(boundaryDetections.startTime, endOfDay),
-					gte(boundaryDetections.endTime, startOfDay),
-					eq(boundaryDetections.boundaryScope, 'single_signal')
-				)
-			)
-			.orderBy(boundaryDetections.sourceSignal, boundaryDetections.startTime);
-
-		// Group single signal boundaries by source signal
-		const signalBoundariesBySource = singleSignalBoundaries.reduce((acc, boundary) => {
-			const key = boundary.sourceSignal || 'unknown';
-			if (!acc[key]) {
-				acc[key] = [];
-			}
-			acc[key].push({
-				id: boundary.id,
-				startTime: boundary.startTime.toISOString(),
-				endTime: boundary.endTime.toISOString(),
-				confidence: boundary.confidence,
-				summary: 'Computed boundary', // Will be enhanced with metadata
-				detectionMethod: boundary.detectionMethod,
-				metadata: {} // Will be populated from signal_boundaries if needed
-			});
-			return acc;
-		}, {} as Record<string, any[]>);
-		*/
-
-		/* Also comment out signal boundaries metadata query
-		// Query the detailed signal boundaries table for richer metadata
-		const signalBoundaryResults = await db
-			.select()
-			.from(signalBoundaries)
-			.where(
-				and(
-					eq(signalBoundaries.userId, userId),
-					// Get boundaries that overlap with the selected day
-					// A boundary overlaps if it starts before end of day AND ends after start of day
-					lte(signalBoundaries.startTime, endOfDay),
-					gte(signalBoundaries.endTime, startOfDay)
-				)
-			)
-			.orderBy(signalBoundaries.sourceName, signalBoundaries.startTime);
-
-		// If no single-signal boundaries in boundary_detections, use signal_boundaries as fallback
-		signalBoundaryResults.forEach(boundary => {
-
-			// Key should match frontend expectation: sourceName_signalName
-			// For iOS speed: sourceName="ios", signalName="ios_speed" -> key should be "ios_speed"
-			// The signalName already contains the full signal identifier
-			const key = boundary.signalName;
-
-			// Parse metadata if it's a string
-			let metadata: any = boundary.boundaryMetadata;
-			if (typeof metadata === 'string') {
-				try {
-					metadata = JSON.parse(metadata);
-				} catch (e) {
-					metadata = {};
-				}
-			}
-
-			// Always add to signalBoundariesBySource (don't try to match with existing)
-			if (!signalBoundariesBySource[key]) {
-				signalBoundariesBySource[key] = [];
-			}
-			signalBoundariesBySource[key].push({
-				id: boundary.id,
-				startTime: boundary.startTime.toISOString(),
-				endTime: boundary.endTime.toISOString(),
-				confidence: boundary.confidence,
-				summary: metadata?.description || metadata?.state || 'Unknown',
-				detectionMethod: boundary.detectionMethod,
-				metadata: metadata || {}
-			});
-		});
-		*/
-
-		// Query signal transitions for ambient signals
+		// Query signal transitions
 		const transitionResults = await db
 			.select()
 			.from(signalTransitions)
@@ -295,10 +175,11 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 		}, {} as Record<string, any[]>);
 
 		// Query HDBSCAN events for the day
+		const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 		const eventsResults = await db
 			.select()
 			.from(events)
-			.where(eq(events.date, `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`))
+			.where(eq(events.date, dateString))
 			.orderBy(events.startTime);
 
 		// Format events for the UI
@@ -311,7 +192,7 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 			clusterSize: event.clusterSize,
 			persistence: event.persistence,
 			transitionIds: event.transitionIds,
-			signalContributions: typeof event.signalContributions === 'string' 
+			signalContributions: typeof event.signalContributions === 'string'
 				? JSON.parse(event.signalContributions as string)
 				: event.signalContributions,
 			metadata: typeof event.metadata === 'string'
@@ -321,20 +202,22 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 		}));
 
 		return {
-			ambientSignalsBySignalName: Object.values(ambientSignalsBySignalName),
-			episodicSignalsBySignalId: Object.values(episodicSignalsBySignalId),
+			signalsByName: Object.values(signalsByName),
 			selectedDate: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
 			contributingSignals,
-			boundaryEvents,
-			signalBoundariesBySource,
 			signalTransitionsBySource,
 			hdbscanEvents,
-			userTimezone
+			userTimezone,
+			// Keep these for backward compatibility with the frontend
+			ambientSignalsBySignalName: Object.values(signalsByName),
+			episodicSignalsBySignalId: [],
+			boundaryEvents: [],
+			signalBoundariesBySource: {}
 		};
-
 	} catch (error) {
 		console.error('Signal analysis page error:', error);
 		return {
+			signalsByName: [],
 			ambientSignalsBySignalName: [],
 			episodicSignalsBySignalId: [],
 			selectedDate: new Date().toISOString(),

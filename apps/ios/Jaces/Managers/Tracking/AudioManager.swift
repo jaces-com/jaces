@@ -13,7 +13,7 @@ import UIKit
 class AudioManager: NSObject, ObservableObject {
     static let shared = AudioManager()
     
-    @Published var microphoneAuthorizationStatus: AVAudioSession.RecordPermission = AVAudioSession.RecordPermission.undetermined
+    @Published var microphoneAuthorizationStatus: AVAudioSession.RecordPermission = .undetermined
     @Published var isRecording = false
     @Published var lastSaveDate: Date?
     @Published var availableAudioInputs: [AVAudioSessionPortDescription] = []
@@ -64,7 +64,7 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     var hasPermission: Bool {
-        return microphoneAuthorizationStatus == AVAudioSession.RecordPermission.granted
+        return microphoneAuthorizationStatus == .granted
     }
     
     // MARK: - Audio Input Management
@@ -240,11 +240,20 @@ class AudioManager: NSObject, ObservableObject {
             return
         }
         
+        // Check if audio is enabled in configuration
+        let isEnabled = DeviceManager.shared.configuration.isStreamEnabled("mic")
+        guard isEnabled else {
+            print("⏸️ Audio stream disabled in web app configuration")
+            return
+        }
+        
+        print("🎤 Starting audio recording")
         do {
             try setupAudioSession()
+            print("✅ Audio session configured")
             startRecordingChunk()
             isRecording = true
-            print("🎤 Started audio recording")
+            print("🎤 Started audio recording with 30-second chunks")
         } catch {
             print("❌ Failed to start recording: \(error)")
         }
@@ -284,15 +293,18 @@ extension AudioManager {
             audioRecorder?.record()
             
             currentChunkStartTime = Date()
+            print("🎵 Started recording new 30-second audio chunk")
             
             // Use DispatchSourceTimer for more reliable background execution
             let timer = DispatchSource.makeTimerSource(queue: timerQueue)
             timer.schedule(deadline: .now() + 30.0)
             timer.setEventHandler { [weak self] in
+                print("⏰ Audio chunk timer fired - finishing chunk...")
                 self?.finishCurrentChunk()
             }
             timer.resume()
             recordingTimer = timer
+            print("⏱️ Audio chunk timer scheduled for 30 seconds")
         } catch {
             print("❌ Failed to start recording chunk: \(error)")
         }
@@ -374,7 +386,7 @@ extension AudioManager {
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(streamData)
             
-            let success = SQLiteManager.shared.enqueue(streamName: "apple_ios_mic_audio", data: data)
+            let success = SQLiteManager.shared.enqueue(streamName: "ios_mic", data: data)
             
             if success {
                 print("✅ Saved audio chunk to SQLite queue")

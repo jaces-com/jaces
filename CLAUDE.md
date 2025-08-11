@@ -61,41 +61,7 @@ jaces/
 
 ## Source Architecture Pattern
 
-The Jaces platform follows a three-tier data architecture: **sources → streams → signals**. This configuration-driven approach handles 20+ integrations without code sprawl:
-
-### Configuration-First Design
-
-- **Source metadata and UI configuration** lives in `assets/config/source_configs.yaml` (with JSON fallback)
-- **Stream definitions** are configured in `assets/config/stream_configs.yaml`
-- **Signal types and processing** defined in `assets/config/signal_configs.yaml`
-- **System defaults** in `assets/config/defaults.yaml`
-- **Master registry** at `sources/_registry.yaml` catalogs all sources, streams, and signals
-- The UI dynamically generates forms, wizards, and settings from configuration
-- No source-specific frontend code - everything is data-driven
-
-### What Goes Where
-
-1. **In configuration files (`assets/config/*.yaml`)**:
-   - Authentication configuration (OAuth scopes, URLs, device tokens)
-   - UI elements (form fields, validation, fidelity options)
-   - Sync settings (schedules, types, defaults)
-   - Display metadata (names, descriptions, icons)
-   - Signal processing parameters and weights
-
-2. **In `sources/base/` (shared infrastructure)**:
-   - Database models and ORM mappings
-   - Storage clients (MinIO, Redis, PostgreSQL)
-   - Authentication handlers
-   - Task scheduler and background jobs
-   - Processing utilities and signal analysis
-   - Abstract interfaces for sources
-
-3. **In `sources/[platform]/[source_name]/`**:
-   - `sync.py` - Data fetching and syncing logic
-   - `stream_processor.py` - Stream-based data processing
-   - `transitions/` - Transition detection algorithms (for applicable sources)
-   - `client.py` - API client (if needed)
-   - `_source.yaml` - Source-specific metadata
+The Jaces platform follows a three-tier data architecture: **sources → streams → signals & semantics**. This configuration-driven approach handles 20+ integrations without code sprawl:
 
 ### Benefits
 

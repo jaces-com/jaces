@@ -48,7 +48,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				connectedDevices = sourceInstances.map(instance => ({
 					id: instance.id,
 					deviceId: instance.deviceId,
-					deviceName: instance.pairedDeviceName || instance.instanceName,
+					deviceName: instance.instanceName,
 					deviceType: instance.deviceType || source.deviceType || sourceName,
 					lastSeen: instance.deviceLastSeen,
 					isActive: instance.isActive,

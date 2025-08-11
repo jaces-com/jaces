@@ -8,19 +8,29 @@ import { eq, and, gte, lte, isNotNull } from 'drizzle-orm';
 // Correctly import the necessary functions
 import { now, parseDate, toZoned } from '@internationalized/date';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
 	try {
 		// Default timezone for single-user app
 		const userTimezone = 'America/Chicago';
 
-		// Get today's date in the user's timezone
-		const todayZoned = now(userTimezone);
+		// Get date from query params or use today
+		const dateParam = url.searchParams.get('date');
 
-		// Create a CalendarDate object for today (year, month, day only)
+		// Parse the date and create timezone-aware start/end times
+		let year, month, day;
+		if (dateParam) {
+			[year, month, day] = dateParam.split('-').map(Number);
+		} else {
+			// Get today in user's timezone
+			const todayZoned = now(userTimezone);
+			year = todayZoned.year;
+			month = todayZoned.month;
+			day = todayZoned.day;
+		}
+
+		// Create a CalendarDate object for the selected date
 		const calendarDate = parseDate(
-			`${todayZoned.year}-${String(todayZoned.month).padStart(2, '0')}-${String(
-				todayZoned.day
-			).padStart(2, '0')}`
+			`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 		);
 
 		// Convert the CalendarDate to a ZonedDateTime to get the start of the day
@@ -43,7 +53,7 @@ export const load: PageServerLoad = async () => {
 			.from(signals)
 			.where(
 				and(
-					eq(signals.signalName, 'apple_ios_coordinates'),
+					eq(signals.signalName, 'ios_coordinates'),
 					gte(signals.timestamp, startOfDayUTC),
 					lte(signals.timestamp, endOfDayUTC),
 					isNotNull(signals.coordinates)

@@ -23,7 +23,7 @@ class HealthKitManager: ObservableObject {
     private var healthTimer: Timer?
     
     // Anchors for incremental sync
-    private var anchors: [String: HKQueryAnchor] = [:]
+    var anchors: [String: HKQueryAnchor] = [:]
     private let anchorKeyPrefix = "com.jaces.healthkit.anchor."
     
     // Define all HealthKit types we need
@@ -53,11 +53,20 @@ class HealthKitManager: ObservableObject {
             return
         }
         
+        // Check if HealthKit is enabled in configuration
+        let isEnabled = DeviceManager.shared.configuration.isStreamEnabled("healthkit")
+        guard isEnabled else {
+            print("⏸️ HealthKit stream disabled in web app configuration")
+            return
+        }
+        
         // Stop any existing timer
         stopMonitoring()
         
         // Start the 5-minute timer (aligned with sync interval)
+        print("⏱️ Creating HealthKit timer with 5-minute interval")
         healthTimer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] _ in
+            print("⏰ HealthKit timer fired - collecting data...")
             Task {
                 await self?.collectNewData()
             }
@@ -66,14 +75,16 @@ class HealthKitManager: ObservableObject {
         // Ensure timer runs in common modes (including background)
         if let timer = healthTimer {
             RunLoop.current.add(timer, forMode: .common)
+            print("✅ HealthKit timer added to RunLoop.common")
         }
         
         // Fire immediately to start collecting
+        print("🚀 Triggering immediate HealthKit data collection")
         Task {
             await collectNewData()
         }
         
-        print("🏥 Started HealthKit monitoring")
+        print("🏥 Started HealthKit monitoring with 5-minute intervals")
     }
     
     func stopMonitoring() {
@@ -171,10 +182,13 @@ class HealthKitManager: ObservableObject {
             }
         }
         
-        let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -7, to: endDate)!
+        // Get initial sync days from configuration (default to 90 if not configured)
+        let initialSyncDays = DeviceManager.shared.configuration.getInitialSyncDays(for: "healthkit")
         
-        print("🏁 Starting HealthKit initial sync from \(startDate) to \(endDate)")
+        let endDate = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -initialSyncDays, to: endDate)!
+        
+        print("🏁 Starting HealthKit initial sync for \(initialSyncDays) days from \(startDate) to \(endDate)")
         
         var allMetrics: [HealthKitMetric] = []
         let totalTypes = healthKitTypes.count
@@ -190,26 +204,67 @@ class HealthKitManager: ObservableObject {
             }
             
             processedTypes += 1
-            let progress = Double(processedTypes) / Double(totalTypes)
+            let collectionProgress = Double(processedTypes) / Double(totalTypes) * 0.5 // First 50% for collection
             await MainActor.run {
-                progressHandler(progress)
+                progressHandler(collectionProgress)
             }
         }
         
         print("📦 Total metrics collected: \(allMetrics.count)")
         
-        // Save to upload queue
+        // Save to upload queue in batches
         if !allMetrics.isEmpty {
-            let success = await saveMetricsToQueue(allMetrics)
-            if success {
-                print("✅ Saved \(allMetrics.count) metrics to upload queue")
-                saveLastSyncDate(endDate)
-            } else {
-                print("❌ Failed to save metrics to upload queue")
+            let batchSize = 1000
+            let totalBatches = (allMetrics.count + batchSize - 1) / batchSize
+            var savedBatches = 0
+            var allSuccess = true
+            
+            print("📦 Saving \(allMetrics.count) metrics in \(totalBatches) batches of up to \(batchSize) each")
+            
+            for batchIndex in 0..<totalBatches {
+                let startIndex = batchIndex * batchSize
+                let endIndex = min((batchIndex + 1) * batchSize, allMetrics.count)
+                let batch = Array(allMetrics[startIndex..<endIndex])
+                
+                print("💾 Saving batch \(batchIndex + 1)/\(totalBatches) with \(batch.count) metrics")
+                let success = await saveMetricsToQueue(batch)
+                
+                if success {
+                    savedBatches += 1
+                    print("✅ Batch \(batchIndex + 1) saved successfully")
+                } else {
+                    print("❌ Failed to save batch \(batchIndex + 1)")
+                    allSuccess = false
+                }
+                
+                // Update progress (second 50% for saving)
+                let saveProgress = 0.5 + (Double(savedBatches) / Double(totalBatches) * 0.5)
+                await MainActor.run {
+                    progressHandler(saveProgress)
+                }
             }
-            return success
+            
+            if allSuccess {
+                print("✅ All \(totalBatches) batches saved successfully")
+                saveLastSyncDate(endDate)
+                
+                // Set anchors after successful initial sync
+                for type in healthKitTypes {
+                    let typeKey = getAnchorKey(for: type)
+                    // Create a new anchor representing "now" to avoid re-syncing this data
+                    let newAnchor = HKQueryAnchor(fromValue: Int.max)
+                    anchors[typeKey] = newAnchor
+                    saveAnchor(newAnchor, for: typeKey)
+                }
+                print("✅ Anchors set for future incremental syncs")
+            } else {
+                print("⚠️ Some batches failed to save")
+            }
+            
+            return allSuccess
         } else {
             print("⚠️ No metrics to save")
+            progressHandler(1.0) // Complete if no data
         }
         
         return true
@@ -510,14 +565,41 @@ class HealthKitManager: ObservableObject {
             }
         }
         
-        // Save directly to SQLite
+        // Save to SQLite in batches if needed
         if !allMetrics.isEmpty {
             print("🏥 Collected \(allMetrics.count) new health metrics")
             
-            let success = await saveMetricsToQueue(allMetrics)
-            if success {
-                await MainActor.run {
-                    self.lastSyncDate = Date()
+            // For regular syncs, batch if more than 1000 metrics
+            if allMetrics.count > 1000 {
+                let batchSize = 1000
+                let totalBatches = (allMetrics.count + batchSize - 1) / batchSize
+                var allSuccess = true
+                
+                print("🏥 Saving \(allMetrics.count) metrics in \(totalBatches) batches")
+                
+                for batchIndex in 0..<totalBatches {
+                    let startIndex = batchIndex * batchSize
+                    let endIndex = min((batchIndex + 1) * batchSize, allMetrics.count)
+                    let batch = Array(allMetrics[startIndex..<endIndex])
+                    
+                    let success = await saveMetricsToQueue(batch)
+                    if !success {
+                        allSuccess = false
+                    }
+                }
+                
+                if allSuccess {
+                    await MainActor.run {
+                        self.lastSyncDate = Date()
+                    }
+                }
+            } else {
+                // Small enough to save as single batch
+                let success = await saveMetricsToQueue(allMetrics)
+                if success {
+                    await MainActor.run {
+                        self.lastSyncDate = Date()
+                    }
                 }
             }
         } else {
@@ -540,7 +622,7 @@ class HealthKitManager: ObservableObject {
             let data = try encoder.encode(streamData)
             
             print("💾 Attempting to save HealthKit data (\(data.count) bytes) to SQLite...")
-            let success = SQLiteManager.shared.enqueue(streamName: "apple_ios_healthkit", data: data)
+            let success = SQLiteManager.shared.enqueue(streamName: "ios_healthkit", data: data)
             
             if success {
                 // Verify it was saved

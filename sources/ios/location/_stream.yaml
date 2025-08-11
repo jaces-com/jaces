@@ -12,6 +12,11 @@ ingestion:
   batch_type: array
   raw_data_type: CLLocation
   
+# Sync configuration
+sync:
+  type: none  # No historical data sync - real-time only
+  schedule: "*/5 * * * *"  # Sync every 5 minutes for device uploads
+  
 # Signals produced by this stream
 signals:
   - altitude
@@ -21,7 +26,7 @@ signals:
 # Processing configuration
 processing:
   deduplication:
-    strategy: timestamp  # Location points should be unique by timestamp
+    strategy: single  # One location per timestamp
   normalization: true
   validation:
     required_fields:
@@ -33,6 +38,13 @@ processing:
       longitude: [-180, 180]
       altitude: [-500, 9000]  # Dead Sea to Everest
       speed: [0, 500]  # m/s, reasonable max for aircraft
+
+# Stream processor configuration
+processor:
+  class_name: StreamProcessor
+  source_name: ios
+  stream_type: array  # iOS sends arrays of location points
+  deduplication_strategy: single  # One location per timestamp
       
 # Storage settings
 storage:

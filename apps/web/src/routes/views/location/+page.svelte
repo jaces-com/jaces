@@ -21,6 +21,13 @@
     let timelineContainerWidth = $state(0);
     let timelineContainer = $state<HTMLDivElement>();
     let hoverMarker = $state<any>(null);
+    
+    // State for date selection
+    let selectedDate = $state(
+        data.selectedDate
+            ? new Date(data.selectedDate).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+    );
 
     // Create a reactive async function for map initialization
     async function initializeMap() {
@@ -209,9 +216,22 @@
         <p class=" text-neutral-600 mb-6 max-w-2xl">
             A location-based view throughout your day.
         </p>
-        <p class=" text-neutral-700 mb-4">
-            Showing your path for {data.selectedDate} ({data.userTimezone})
-        </p>
+        <div class="flex items-center gap-4 mb-4">
+            <input
+                type="date"
+                bind:value={selectedDate}
+                onchange={() => {
+                    // Update URL with selected date and reload page to fetch new data
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("date", selectedDate);
+                    window.location.href = url.toString();
+                }}
+                class="border border-neutral-300 bg-white rounded-lg px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-neutral-500 focus:border-neutral-500 transition-all"
+            />
+            <p class="text-neutral-700">
+                Showing location data for {selectedDate} ({data.userTimezone})
+            </p>
+        </div>
 
         <div class="mt-6">
             {#if error}
@@ -224,7 +244,7 @@
                     class="flex items-center justify-center h-64 bg-gray-50 rounded-lg"
                 >
                     <p class="text-gray-500">
-                        No location data found for today.
+                        No location data found for {selectedDate}.
                     </p>
                 </div>
             {:else if data.coordinateSignals.length === 1}
@@ -248,10 +268,12 @@
                             selectedDate={data.selectedDate}
                             containerWidth={timelineContainerWidth}
                             padding={0}
+                            userTimezone={data.userTimezone}
                         >
                             <div class="relative w-full" style="height: 60px;">
                                 <TimelineGrid
                                     selectedDate={data.selectedDate}
+                                    userTimezone={data.userTimezone}
                                 />
 
                                 <!-- Location data availability indicator -->
@@ -266,6 +288,7 @@
                                 >
                                     <TimelineLegend
                                         selectedDate={data.selectedDate}
+                                        userTimezone={data.userTimezone}
                                     />
                                 </div>
                                 <TimelineCursor />

@@ -16,9 +16,6 @@ auth:
   auth_url: https://accounts.google.com/o/oauth2/v2/auth
   token_url: https://oauth2.googleapis.com/token
   revoke_url: https://oauth2.googleapis.com/revoke
-  
-# OAuth configuration
-oauth:
   auth_proxy: https://auth.jaces.com/google/auth
   token_refresh_window: 300  # Refresh 5 minutes before expiry
   

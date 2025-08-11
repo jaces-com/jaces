@@ -28,11 +28,7 @@
 	// let isRunningAnalysis = $state(false);
 	// let analysisError = $state<string | null>(null);
 	// Removed boundary detection - focusing on transitions only
-
-	// HDBSCAN event generation state
-	let isGeneratingEvents = $state(false);
-	let eventGenerationError = $state<string | null>(null);
-	let eventGenerationSuccess = $state<string | null>(null);
+	// Removed manual event generation - events are now auto-generated
 
 	// Source timelines from server data - derived from data prop
 	let sourceTimelines = $derived(processServerData());
@@ -120,6 +116,29 @@
 									max: 100,
 									unit: signalGroup.unit || "count",
 								};
+				} else if (signalGroup.visualizationType === "event") {
+					// For discrete events (like calendar events), show as blocks
+					rawSignals = signalGroup.signals.map((signal: any) => {
+						// Parse metadata if it's a string
+						let metadata = signal.sourceMetadata;
+						if (typeof metadata === 'string') {
+							try {
+								metadata = JSON.parse(metadata);
+							} catch (e) {
+								metadata = {};
+							}
+						}
+						
+						return {
+							timestamp: new Date(signal.timestamp),
+							value: 1, // Always 1 for event presence
+							label: signal.signalValue || signal.signalName,
+							duration: 60 * 60 * 1000, // Default 1 hour duration for events
+							metadata: metadata
+						};
+					});
+
+					signalRange = { min: 0, max: 1, unit: "event" };
 				} else {
 					// Default fallback for unknown types
 					rawSignals = signalGroup.signals.map((signal: any) => ({
@@ -148,6 +167,28 @@
 				) => {
 					return signalGroup.displayName || signalName;
 				};
+				
+				// Parse just the signal part (after source_stream)
+				const getSignalPart = (fullSignalName: string, sourceName: string, streamName: string) => {
+					// Remove source_stream prefix to get just the signal
+					const prefix = `${sourceName}_${streamName}_`;
+					if (fullSignalName.startsWith(prefix)) {
+						return fullSignalName.substring(prefix.length);
+					}
+					// Fallback: try just source_ prefix
+					const sourcePrefix = `${sourceName}_`;
+					if (fullSignalName.startsWith(sourcePrefix)) {
+						const remainder = fullSignalName.substring(sourcePrefix.length);
+						// If we have a stream, remove it too
+						if (streamName && remainder.startsWith(`${streamName}_`)) {
+							return remainder.substring(`${streamName}_`.length);
+						}
+						return remainder;
+					}
+					return fullSignalName;
+				};
+				
+				const signalPart = getSignalPart(signalGroup.signalName, signalGroup.sourceName, signalGroup.streamName);
 
 				return {
 					name: signalGroup.signalName,
@@ -156,13 +197,16 @@
 						signalGroup.sourceName,
 						signalGroup.signalName,
 					),
+					sourceName: signalGroup.sourceName,
+					streamName: signalGroup.streamName,
+					signalName: signalPart,
 					company:
 						signalGroup.sourceName.includes("apple") ||
 						signalGroup.sourceName === "ios" ||
 						signalGroup.sourceName === "mac"
 							? ("apple" as const)
 							: ("google" as const),
-					type: "ambient" as const,
+					type: signalGroup.visualizationType === "event" ? ("event" as const) : ("continuous" as const),
 					visualizationType: signalGroup.visualizationType,
 					events: [], // No processed events yet
 					feltEvents: [], // No FELT events yet
@@ -290,16 +334,7 @@
 		return timelines;
 	}
 
-	// Handle signal analysis completion from child components
-	async function handleSignalAnalysisComplete() {
-		// Invalidate all signal analysis data to force a complete refresh
-		await invalidate("signal-analysis:transitions");
-		await invalidate("signal-analysis:ambient-signals");
-		// Also invalidate the entire page data to ensure we get fresh data
-		await invalidate("app:data");
-		// The reactive data bindings will automatically update the UI
-		// No need for a full page reload
-	}
+	// Removed: handleSignalAnalysisComplete - transitions now happen automatically in the pipeline
 
 	// Format time for display
 	function formatTime(date: Date): string {
@@ -312,56 +347,7 @@
 		});
 	}
 
-	// Generate HDBSCAN events
-	async function generateDayEvents() {
-		isGeneratingEvents = true;
-		eventGenerationError = null;
-		eventGenerationSuccess = null;
-
-		try {
-			const response = await fetch(
-				"/api/signal-analysis/generate-events",
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						date: selectedDate,
-						minClusterSize: 3,
-						epsilon: 300,
-					}),
-				},
-			);
-
-			if (!response.ok) {
-				throw new Error(
-					`Failed to generate events: ${response.statusText}`,
-				);
-			}
-
-			const result = await response.json();
-
-			if (result.success) {
-				// Success!
-				isGeneratingEvents = false;
-				eventGenerationSuccess = `Generated ${result.events_created} events from ${result.transitions_processed} transitions (${result.noise_points} outliers)`;
-
-				// Reload page to show new events
-				setTimeout(() => {
-					window.location.reload();
-				}, 1500);
-			} else {
-				throw new Error(result.error || "Unknown error occurred");
-			}
-		} catch (error) {
-			eventGenerationError =
-				error instanceof Error
-					? error.message
-					: "Failed to generate events";
-			isGeneratingEvents = false;
-		}
-	}
+	// Removed manual event generation - events are now auto-generated
 
 	// Run signal analysis
 	async function runSignalAnalysis() {
@@ -531,47 +517,12 @@
 						class="border border-neutral-300 bg-white rounded-lg px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-neutral-500 focus:border-neutral-500 transition-all"
 					/>
 					<!-- Boundary detection removed -->
-					<!--
-					<Button
-						onclick={runSignalAnalysis}
-						disabled={isRunningAnalysis}
-						text={isRunningAnalysis
-							? "Running..."
-							: "Run Signal Analysis"}
-					/>
-					<p class="text-sm text-neutral-700">
-						{analysisResults.length} boundaries detected
-					</p>
-					-->
-
-					<!-- HDBSCAN Event Generation -->
-					<Button
-						onclick={generateDayEvents}
-						disabled={isGeneratingEvents}
-						text={isGeneratingEvents
-							? "Generating..."
-							: "Generate Day Events"}
-					/>
+					<!-- Event generation is now automatic -->
 				</div>
 			</div>
 
 			<!-- Error message display removed (boundary detection) -->
-
-			<!-- Event generation messages -->
-			{#if eventGenerationError}
-				<div
-					class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4"
-				>
-					{eventGenerationError}
-				</div>
-			{/if}
-			{#if eventGenerationSuccess}
-				<div
-					class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4"
-				>
-					{eventGenerationSuccess}
-				</div>
-			{/if}
+			<!-- Event generation messages removed (now automatic) -->
 		</div>
 
 		<!-- Signal Analysis Card -->
@@ -633,9 +584,8 @@
 							{:else}
 								<div class="px-6 pt-4 pb-6">
 									<p class="text-sm text-neutral-500 italic">
-										No events detected. Click "Generate Day
-										Events" to run HDBSCAN clustering on
-										transitions.
+										No events detected yet. Events are automatically
+										generated from signal transitions.
 									</p>
 								</div>
 							{/if}
@@ -684,13 +634,16 @@
 						<div class="relative">
 							<!-- Signal Timelines -->
 							{#each sourceTimelines as source}
+								<!-- Removed: onSignalAnalysisComplete - transitions now happen automatically -->
 								<SignalTimeline
 									name={source.name}
 									displayName={source.displayName}
+									sourceName={source.sourceName}
+									streamName={source.streamName}
+									signalName={source.signalName}
 									company={source.company}
 									type={source.type}
 									visualizationType={source.visualizationType}
-									onSignalAnalysisComplete={handleSignalAnalysisComplete}
 									computedEvents={source.feltEvents ||
 										source.events ||
 										[]}
