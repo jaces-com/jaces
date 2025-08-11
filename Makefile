@@ -54,6 +54,15 @@ dev: env-check
 	@echo "🪣 Initializing MinIO buckets..."
 	@docker-compose exec -T minio mc alias set local http://localhost:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin} &>/dev/null || true
 	@docker-compose exec -T minio mc mb local/jaces --ignore-existing &>/dev/null || true
+	@echo "📝 Pushing database schema..."
+	@docker-compose exec -T web pnpm db:push &>/dev/null || true
+	@echo "📊 Checking registry..."
+	@if [ ! -f sources/_generated_registry.yaml ]; then \
+		echo "   Generating sources registry..."; \
+		(python scripts/generate_registry.py || python3 scripts/generate_registry.py) &>/dev/null || true; \
+	fi
+	@echo "🌱 Seeding database with test data..."
+	@docker-compose exec -T -e DATABASE_URL="$(DB_URL_DOCKER)" -e MINIO_ENDPOINT="minio:9000" web pnpm db:seed &>/dev/null || true
 	@echo "🎨 Starting Drizzle Studio..."
 	@docker-compose exec -d -e DATABASE_URL="$(DB_URL_DOCKER)" web pnpm drizzle-kit studio --host 0.0.0.0 --port $(STUDIO_PORT) &>/dev/null || true
 	@echo ""
