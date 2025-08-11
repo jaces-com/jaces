@@ -30,6 +30,21 @@ PROCESSING_PORT ?= 8001
 
 # === DEVELOPMENT COMMANDS ===
 
+# Check if .env exists, create from example if not
+env-check:
+	@if [ ! -f .env ]; then \
+		echo "📋 No .env file found. Creating from .env.example..."; \
+		cp .env.example .env; \
+		echo "✅ Created .env file with default development settings"; \
+		echo "   You can customize it later if needed for OAuth integrations"; \
+	fi
+
+# Setup environment file (force copy from example)
+env-setup:
+	@echo "📋 Creating .env from .env.example..."
+	@cp .env.example .env
+	@echo "✅ Created .env file"
+
 # Start development environment with all services
 dev: env-check
 	@echo "🚀 Starting Jaces in development mode..."
