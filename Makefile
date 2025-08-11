@@ -55,7 +55,7 @@ dev: env-check
 	@docker-compose exec -T minio mc alias set local http://localhost:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin} &>/dev/null || true
 	@docker-compose exec -T minio mc mb local/jaces --ignore-existing &>/dev/null || true
 	@echo "📝 Pushing database schema..."
-	@docker-compose exec -T web pnpm db:push &>/dev/null || true
+	@docker-compose exec -T web npx drizzle-kit push --force &>/dev/null || true
 	@echo "📊 Checking registry..."
 	@if [ ! -f sources/_generated_registry.yaml ]; then \
 		echo "   Generating sources registry..."; \
