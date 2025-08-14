@@ -11,9 +11,20 @@ jobs:
   run:
     name: Make GitHub Traffic to Badge
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating/updating the traffic branch
+      actions: read    # Required for reading action outputs
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TRAFFIC_TOKEN }}  # Use TRAFFIC_TOKEN for checkout as well
+          fetch-depth: 0  # Fetch all history for all branches
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
 
       - name: Get Commit Message
         id: message
@@ -50,7 +61,7 @@ jobs:
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3.9.3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          personal_token: ${{ secrets.TRAFFIC_TOKEN }}  # Use TRAFFIC_TOKEN which has write permissions
           publish_branch: ${{ steps.traffic.outputs.traffic_branch }}
           publish_dir: ${{ steps.traffic.outputs.traffic_path }}
           user_name: 'github-actions[bot]'
