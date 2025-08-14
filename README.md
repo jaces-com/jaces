@@ -6,11 +6,15 @@
 [![License: ELv2](https://img.shields.io/badge/License-ELv2-orange.svg)](https://www.elastic.co/licensing/elastic-license)
 
 > [!WARNING]
-> **Experimental Phase**: Expect rapid iteration and breaking changes as we refine the core experience.
+> **Experimental Phase**: Expect rapid iteration and sweeping changes as we refine the core applications and infrastructure.
 
 ## What is Jaces
 
 Jaces is your personal AI agent that ingests your digital life—from calendar events and locations to health metrics and screen time—constructing a coherent, queryable timeline. Unlike cloud services that monetize your data, Jaces runs on your infrastructure, ensuring complete privacy and control.
+
+<video src=".github/videos/example.webm" width="100%" controls autoplay loop muted>
+  View the demo video
+</video>
 
 Your data is incredibly valuable—companies build trillion-dollar empires on it. Jaces lets you reclaim that value for yourself:
 
@@ -20,6 +24,31 @@ Your data is incredibly valuable—companies build trillion-dollar empires on it
 - **Build a queryable life archive** of your entire digital existence
 - **Generate insights for self-improvement** from your actual behavior
 - **See what data companies collect** and take back control
+
+## Your Data, Your Database
+
+Unlike cloud services that lock away your data, Jaces gives you **direct PostgreSQL access**. Query your life with SQL, build custom analytics, or export everything—it's your database.
+
+```python
+# Connect directly to YOUR data
+import psycopg2
+import pandas as pd
+
+conn = psycopg2.connect(
+    "postgresql://readonly_user:secure_pass@your-server:5432/jaces"
+)
+
+# Query your heart rate during meetings
+df = pd.read_sql("""
+    SELECT s.time, s.value as bpm, c.title as meeting
+    FROM signals s
+    JOIN signals c ON c.type = 'calendar_event' 
+    WHERE s.type = 'heart_rate'
+    AND s.time BETWEEN c.start_time AND c.end_time
+""", conn)
+```
+
+**Manage credentials** at `/settings/database` in your Jaces UI—create read-only users for analysis or full access for integrations. Works with any PostgreSQL client: TablePlus, DBeaver, Jupyter notebooks, or your favorite BI tool.
 
 ## ✨ Features
 
@@ -68,7 +97,7 @@ Sources → Streams → Signals & Semantics → Event Timeline
 | Mac | Browser | Bookmarks | 📋 | Semantic | Saved links |
 | Mac | Browser | Downloads | 📋 | Signal | Downloaded files |
 | Notion | Pages | Page Content | ✅ | Semantic | Document text |
-| Notion | Pages | Database Content | ✅ | Semantic | Structured data |
+| Notion | Pages | Database Content | 📋 | Semantic | Structured data |
 | Amazon | Orders | Purchase History | 📋 | Semantic | Order details |
 | Amazon | Orders | Spending Patterns | 📋 | Signal | Purchase trends |
 | Amazon | Orders | Delivery Events | 📋 | Signal | Package tracking |
@@ -76,8 +105,8 @@ Sources → Streams → Signals & Semantics → Event Timeline
 | WhatsApp | Messages | Voice Notes | 📋 | Signal | Audio messages |
 | LinkedIn | Profile | Views | 📋 | Signal | Profile activity |
 | LinkedIn | Messages | Conversations | 📋 | Semantic | Professional chats |
-| Twitter/X | Posts | Tweets | 📋 | Semantic | Posted content |
-| Twitter/X | Posts | Engagement | 📋 | Signal | Likes & retweets |
+| X | Posts | Tweets | 📋 | Semantic | Posted content |
+| X | Posts | Engagement | 📋 | Signal | Likes & retweets |
 | Spotify | Listening | History | 📋 | Signal | Songs played |
 | Spotify | Listening | Playlists | 📋 | Semantic | Playlist data |
 | Plaid | Banking | Transactions | 📋 | Signal | Bank activity |
