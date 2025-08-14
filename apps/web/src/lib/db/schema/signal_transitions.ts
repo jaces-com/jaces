@@ -1,4 +1,4 @@
-import { pgTable, uuid, timestamp, real, text, varchar, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, timestamp, real, text, varchar, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const signalTransitions = pgTable('signal_transitions', {
@@ -20,6 +20,14 @@ export const signalTransitions = pgTable('signal_transitions', {
 }, (table) => {
   return {
     sourceSignalIdx: index('idx_signal_transition_source').on(table.sourceName, table.signalName),
+    // Unique constraint to support ON CONFLICT in Python code
+    uniqueTransition: uniqueIndex('unique_signal_transition').on(
+      table.sourceName, 
+      table.signalName, 
+      table.transitionTime, 
+      table.transitionType, 
+      table.changeDirection
+    ),
   };
 });
 

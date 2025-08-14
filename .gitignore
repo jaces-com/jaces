@@ -25,6 +25,8 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
+.ropeproject/
+.conductor/
 
 # macOS
 .DS_Store

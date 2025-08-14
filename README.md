@@ -5,97 +5,124 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: ELv2](https://img.shields.io/badge/License-ELv2-orange.svg)](https://www.elastic.co/licensing/elastic-license)
 
-> Open-source personal memory and data platform. Your data, your infrastructure, your control.
-
 > [!WARNING]
-> **Experimental Phase**: We're still figuring out the core architecture and user experience. Jump in if you want to help shape the future of personal data sovereignty, but expect rapid iteration and breaking changes.
+> **Experimental Phase**: Expect rapid iteration and breaking changes as we refine the core experience.
 
-## What is Jaces?
+## What is Jaces
 
-In a world where tech giants monetize every click, scroll, and heartbeat, Jaces offers a radical alternative: **complete data sovereignty**. This isn't another cloud service where your data mingles with millions of others. Jaces is your personal AI agent that ingests the digital exhaust of your existence—from calendar events and locations to health metrics and screen time—constructing a coherent, queryable timeline of your life.
+Jaces is your personal AI agent that ingests your digital life—from calendar events and locations to health metrics and screen time—constructing a coherent, queryable timeline. Unlike cloud services that monetize your data, Jaces runs on your infrastructure, ensuring complete privacy and control.
 
-**The AI that helps you know yourself better.** From being the product to becoming the protagonist.
+Your data is incredibly valuable—companies build trillion-dollar empires on it. Jaces lets you reclaim that value for yourself:
 
-## How It Works
-
-```
-📱 Your Sources & Streams    🔄 Continuous Processing        🎯 Intelligent Timeline
-┌─────────────────┐          ┌──────────────────────┐        ┌─────────────────────┐
-│ • iOS Health    │          │  📊 Signals          │        │  🕐 Timeline        │
-│ • Location      │  ──►     │  (Change Detection)  │  ──►   │  "Heart rate spiked"│
-│ • Calendar      │          │  Heart rate: 72→120  │        │  "Entered office"   │
-│ • Notion docs   │          │                      │        │  "Meeting started"  │
-│ • Mac apps      │          │  📝 Semantics        │        │  "Doc: Project Plan"│
-└─────────────────┘          │  (Knowledge Base)    │        │  "Note: Summary"    │
-                             │  Docs, notes, pages  │        └─────────────────────┘
-                             └──────────────────────┘              ↓
-                                      ↓                     🔍 Query Your Life
-                             🎯 PELT Algorithm              "When did I last..."
-                             Detects transitions &          "Show me patterns in..."
-                             meaningful changes              "What happened before..."
-```
-
-**Signals** are for change detection—PELT algorithms and boundary detection find meaningful transitions in heart rate, location, app focus, calendar events. **Semantics** are for content knowledge bases & retrieval—GPU-accelerated vector search across documents, notes, and pages. Together they create a searchable timeline of your life, turning noise into insight.
-
-Think of it as your:
-
-- **Second brain** that actually remembers everything
-- **Personal historian** documenting your life
-- **Computational phronesis engine** for practical wisdom from your own data
-- **Private memory palace** that you own completely
+- **Train personal AI on YOUR data**, not theirs
+- **Life logging and memory augmentation** for perfect recall
+- **Health and productivity optimization** through pattern recognition  
+- **Build a queryable life archive** of your entire digital existence
+- **Generate insights for self-improvement** from your actual behavior
+- **See what data companies collect** and take back control
 
 ## ✨ Features
 
 ### Data Sources
 
-#### ✅ Live & Working
+See the [Implementation Status](#-implementation-status) section below for detailed availability of all sources, streams, and signals.
 
-- **iOS**: HealthKit (heart rate, steps, workouts, sleep), Location tracking, Audio transcription
-- **macOS**: Application usage and focus events
-- **Google**: Calendar events and meeting patterns
-- **Notion**: Pages and databases from your workspace
+### Architecture
 
-#### 📋 Planned
+```txt
+Sources → Streams → Signals & Semantics → Event Timeline
+```
 
-- **Google**: Gmail, Drive, Photos
-- **Fitness**: Strava, Garmin, Fitbit
-- **Communication**: Slack, Discord, Telegram
-- **Financial**: Transaction processing
-- **Media**: Spotify, YouTube
+- **Sources**: Raw data from your devices and services
+- **Streams**: Time-series data stored with full fidelity
+- **Signals**: State changes detected via PELT algorithms (heart rate spikes, location changes)
+- **Semantics**: Knowledge extracted from documents and notes
+- **Timeline**: Your queryable life history of 8-24 events in a day through an LLM-friendly Thomistic framework of context
 
-### Architecture Highlights
+## Status
 
-- **Hot Day, Cold Night**: Real-time processing for "what's happening now?" transitions to nightly consolidation for "what did today mean?"
-- **ELT Data Pipeline**: Sources (Extract) → Streams (Load) → Signals & Semantics (Transform)
-  - **Signals**: Time-series data (heart rate changes, app switches, location moves)
-  - **Semantics**: Content data (documents, notes, calendar events)
-- **Configuration-Driven**: Sources defined in YAML, UI auto-generates from config
-- **Privacy-First**: All auth is proxied, we never see your credentials
+### Implementation Overview
 
-### Platform Components
+| Source | Stream | Signal/Semantic | Status | Type | Description |
+|--------|--------|-----------------|--------|------|-------------|
+| Google | Calendar | Events | ✅ | Signal | Meeting detection |
+| Google | Gmail | Emails | 📋 | Semantic | Email content |
+| Google | Gmail | Attachments | 📋 | Signal | File attachments |
+| Google | Drive | Document Edits | 📋 | Signal | File modifications |
+| Google | Drive | Shared Files | 📋 | Signal | Collaboration activity |
+| iOS | HealthKit | Heart Rate | ✅ | Signal | BPM tracking |
+| iOS | HealthKit | Steps | ✅ | Signal | Daily step count |
+| iOS | HealthKit | Active Energy | ✅ | Signal | Calories burned |
+| iOS | HealthKit | Sleep | ✅ | Signal | Sleep stages |
+| iOS | HealthKit | Workouts | ✅ | Signal | Exercise tracking |
+| iOS | HealthKit | HRV | ✅ | Signal | Heart rate variability |
+| iOS | Location | Coordinates | ✅ | Signal | GPS tracking |
+| iOS | Location | Speed | ✅ | Signal | Movement speed |
+| iOS | Location | Altitude | ✅ | Signal | Elevation data |
+| iOS | Microphone | Audio Level | ✅ | Signal | Sound levels |
+| iOS | Microphone | Transcription | ✅ | Signal | Voice-to-text |
+| Mac | Applications | Activity | ✅ | Signal | App focus tracking |
+| Mac | iMessage | Messages | 📋 | Semantic | Chat history |
+| Mac | iMessage | Attachments | 📋 | Signal | Shared media |
+| Mac | Browser | History | 📋 | Signal | Browsing patterns |
+| Mac | Browser | Bookmarks | 📋 | Semantic | Saved links |
+| Mac | Browser | Downloads | 📋 | Signal | Downloaded files |
+| Notion | Pages | Page Content | ✅ | Semantic | Document text |
+| Notion | Pages | Database Content | ✅ | Semantic | Structured data |
+| Amazon | Orders | Purchase History | 📋 | Semantic | Order details |
+| Amazon | Orders | Spending Patterns | 📋 | Signal | Purchase trends |
+| Amazon | Orders | Delivery Events | 📋 | Signal | Package tracking |
+| WhatsApp | Messages | Conversations | 📋 | Semantic | Chat text |
+| WhatsApp | Messages | Voice Notes | 📋 | Signal | Audio messages |
+| LinkedIn | Profile | Views | 📋 | Signal | Profile activity |
+| LinkedIn | Messages | Conversations | 📋 | Semantic | Professional chats |
+| Twitter/X | Posts | Tweets | 📋 | Semantic | Posted content |
+| Twitter/X | Posts | Engagement | 📋 | Signal | Likes & retweets |
+| Spotify | Listening | History | 📋 | Signal | Songs played |
+| Spotify | Listening | Playlists | 📋 | Semantic | Playlist data |
+| Plaid | Banking | Transactions | 📋 | Signal | Bank activity |
+| Plaid | Credit Cards | Purchases | 📋 | Semantic | Transaction details |
+| Plaid | Investments | Portfolio | 📋 | Signal | Portfolio value |
+| GitHub | Repository | Commits | 📋 | Signal | Code changes |
+| GitHub | Repository | Pull Requests | 📋 | Semantic | PR content |
+| GitHub | Repository | Issues | 📋 | Semantic | Issue tracking |
+| Slack | Workspace | Messages | 📋 | Semantic | Team chats |
+| Slack | Workspace | Mentions | 📋 | Signal | Direct mentions |
+| Strava | Activities | Workouts | 📋 | Signal | Exercise data |
+| Strava | Activities | Performance | 📋 | Signal | Speed & pace |
+| Zoom | Meetings | Attendance | 📋 | Signal | Meeting tracking |
+| Zoom | Meetings | Recordings | 📋 | Semantic | Transcripts |
 
-- **Web Dashboard**: Beautiful, maintenance-free interface for exploring your life timeline
-- **Native iOS App**: Seamless background data collection with minimal battery impact
-- **macOS Agent**: Lightweight system monitoring that captures your digital context
-- **AI Analysis**: Your shield against predatory AI—local LLM integration that works for you
+### Legend
+
+- ✅ **Stable**: Fully implemented and tested
+- 🚧 **In Progress**: Actively being developed
+- 📋 **Planned**: On the roadmap
+
+### Notes
+
+- **Authentication Requirements**: Cloud sources require OAuth2 setup. Device sources require the native app installation.
+- **Sync Intervals**: Shown in parentheses for active streams. Pull-based sources check for updates, push-based sources upload batched data.
+- **PELT Algorithm**: Change Point Detection using Pruned Exact Linear Time with either L1 (sum of absolute differences) or L2 (sum of squared differences) cost functions.
+- **iOS Requirements**: Minimum iOS 14.0, requires location/health/microphone permissions
+- **Mac Requirements**: Minimum macOS 11.0, requires accessibility and automation permissions
 
 ## 🚀 Quick Start
 
-Get Jaces running in under 5 minutes:
+Get Jaces running in under 2 minutes:
 
 ```bash
 # Clone the repository
 git clone https://github.com/jaces-com/jaces
 cd jaces
 
-# Copy environment template
-cp .env.example .env
-
 # Start the entire stack (PostgreSQL, Redis, MinIO, Web App, Workers)
+# make dev automatically clones .env.example as .env if none available
 make dev
 
 # Open the dashboard
 open http://localhost:3000
+
 ```
 
 That's it! The system will:
@@ -106,88 +133,164 @@ That's it! The system will:
 - Launch the SvelteKit web application
 - Spin up Celery workers for background processing
 
-## 📦 Installation
+## 🌐 Self-Hosting & Networking
 
-### Prerequisites
+### Recommended: Tailscale Setup (5 Minutes)
 
-- Docker & Docker Compose (v2.0+)
-- Node.js 18+ and pnpm (for local development)
-- Python 3.11+ (for backend development)
-- 8GB RAM minimum, 16GB recommended
-- 20GB free disk space for data storage
+Tailscale creates a secure, private network between your devices. Your Jaces instance stays completely private while remaining accessible from all your devices.
 
-### Production Deployment
-
-For production deployment on AWS EC2 or similar:
+#### Quick Start with Tailscale
 
 ```bash
-# Use the production compose file
-docker-compose -f docker-compose.prod.yml up -d
+# 1. Install Tailscale on your server (where Docker is running)
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
 
-# Run database migrations
-make db-migrate
+# 2. Note your Tailscale IP (shown after login, e.g., 100.64.1.5)
 
-# Check system health
-make health-check
+# 3. Install Tailscale app on your devices:
+# - iOS: App Store → Tailscale
+# - macOS: brew install --cask tailscale
+# - Windows/Linux: https://tailscale.com/download
+
+# 4. Update your .env file:
+PUBLIC_IP=100.64.1.5  # Your Tailscale IP from step 2
+FRONTEND_URL=http://100.64.1.5:3000
+
+# 5. Restart Jaces:
+make restart
+
+# 6. Access from any device on your Tailscale network:
+open http://100.64.1.5:3000
+# Or use MagicDNS: http://your-machine.tail-scale.ts.net:3000
 ```
 
-## 🏗️ Architecture
+**Why Tailscale?**
 
-Jaces follows a three-tier data architecture that processes your digital exhaust into actionable insights:
+Zero exposed port -- servers aren't on the public internet. E2EE WireGuard protocol. Behind firewalls, NAT, cellular networks. 100 devices, 3 users, perfect for personal use.
 
+### Direct Database Access
+
+Once on Tailscale, you can connect directly to your PostgreSQL database:
+
+```python
+# Python
+import psycopg2
+import pandas as pd
+
+conn = psycopg2.connect(
+    "postgresql://jaces_user:jaces_password@100.64.1.5:5432/jaces"
+)
+df = pd.read_sql("SELECT * FROM signals WHERE type='heart_rate'", conn)
 ```
-┌─────────────┐     ┌─────────────┐     ┌──────────────────────┐
-│   Sources   │ ──> │   Streams   │ ──> │ Signals & Semantics  │
-└─────────────┘     └─────────────┘     └──────────────────────┘
-     Raw Data         Time-Series         Signals: State changes
-   (APIs, Files)    (Processed Data)      Semantics: Content/docs
+
+```javascript
+// JavaScript/TypeScript
+import { Client } from 'pg';
+
+const client = new Client({
+  connectionString: 'postgresql://jaces_user:jaces_password@100.64.1.5:5432/jaces'
+});
+await client.connect();
+const result = await client.query('SELECT * FROM signals');
 ```
 
-### The ELT Paradigm
+See the [Database Access](#database-access) section for managing read-only users and connection strings.
 
-Jaces follows the modern **ELT (Extract, Load, Transform)** data engineering pattern, where raw data preservation and flexible transformation are prioritized:
+### Alternative Networking Options
 
-- **Extract (Sources)**: Pull raw data from APIs, files, and device sensors without heavy processing
-- **Load (Streams)**: Store time-series data in MinIO and PostgreSQL, maintaining full fidelity
-- **Transform (Signals & Semantics)**: Apply intelligent transformations on-demand:
-  - **Signals**: PELT algorithms detect meaningful state changes and transitions
-  - **Semantics**: Vector embeddings and knowledge extraction from documents
+**Local Only (Simplest):**
 
-#### Why ELT Matters for Personal Data
+```bash
+# No changes needed, access at:
+http://localhost:3000
+```
 
-Traditional ETL (Extract, Transform, Load) systems transform data before storage, losing raw information forever. Jaces' ELT approach means:
+**Public VPS (Advanced):**
 
-- **Never lose raw data**: Your original data is preserved, allowing future reprocessing as algorithms improve
-- **Flexible analysis**: Add new signal detectors or semantic extractors without re-ingesting data
-- **Time travel**: Replay and reanalyze past events with new insights or corrected algorithms
-- **Incremental processing**: Transform only what's needed, when it's needed, saving compute resources
-- **Audit trail**: Full lineage from raw source to final insight is always available
+- Use the included `deploy-ec2-setup.sh` script
+- Add HTTPS with Caddy or Traefik
+- Consider authentication layer (Authelia)
 
-### Hot Day, Cold Night Architecture
+### How External Services Work
 
-**☀️ Hot Day (Real-time)**
+Even with Tailscale, these features work perfectly:
 
-- Processes incoming data streams throughout the day
-- Maintains GPU-accelerated vector indices for instant retrieval
-- Answers: "What is happening right now?"
-- Sub-second query responses across your entire digital life
+- **OAuth (Google/Notion)**: Handled by `auth.jaces.com` proxy
+- **API Syncing**: Outbound connections work normally
+- **AI Features**: Can call OpenAI/Anthropic APIs
+- **Calendar/Email**: Fetches data via polling
 
-**🌙 Cold Night (Synthesis)**
+Your instance makes outbound connections but accepts no inbound traffic from the internet.
 
-- Runs nightly consolidation and boundary detection while you sleep
-- Transforms raw signals into coherent life events and permanent memories
-- Answers: "What did today mean?"
-- Builds long-term patterns, discovers recurring habits
+## 📦 Prerequisites
+
+- Docker & Docker Compose (v2.0+)
+- 8GB RAM minimum, 16GB recommended
+- 20GB free disk space
+
+## 🔐 Database Access
+
+Jaces provides direct PostgreSQL access for power users. Connect with any SQL client, Jupyter notebooks, or your favorite programming language.
+
+### Managing Database Users
+
+Navigate to `/settings/database` in your Jaces web UI to:
+
+- Create read-only users for safe data analysis
+- Create read-write users for custom integrations  
+- Generate secure connection strings
+
+### Example Queries
+
+```sql
+-- Recent heart rate data
+SELECT time, value FROM signals 
+WHERE type = 'heart_rate' 
+AND time > NOW() - INTERVAL '24 hours'
+ORDER BY time DESC;
+
+-- Location history with PostGIS
+SELECT time, ST_X(location::geometry) as lon, ST_Y(location::geometry) as lat
+FROM signals 
+WHERE type = 'location'
+AND time::date = CURRENT_DATE;
+
+-- Daily activity summary
+SELECT 
+  DATE(time) as day,
+  type,
+  COUNT(*) as events,
+  AVG(value) as avg_value
+FROM signals
+GROUP BY DATE(time), type
+ORDER BY day DESC, type;
+```
+
+## 🏗️ Technical Details
+
+### ELT Data Pipeline
+
+Jaces uses an ELT (Extract, Load, Transform) architecture to preserve raw data while enabling flexible analysis:
+
+1. **Extract**: Pull raw data from APIs and devices
+2. **Load**: Store in MinIO and PostgreSQL with full fidelity
+3. **Transform**: Apply PELT algorithms and semantic extraction on-demand
+
+This approach ensures you never lose data and can reprocess with improved algorithms later.
+
+### Processing Modes
+
+- **Real-time**: Continuous processing for immediate insights
+- **Batch**: Nightly consolidation for pattern discovery
+- **On-demand**: Query-time transformations for flexibility
 
 ### Tech Stack
 
-- **Frontend**: SvelteKit, TypeScript, TailwindCSS, D3.js
-- **Backend**: Python, SvelteKit API routes, Celery, SQLAlchemy
-- **Databases**: PostgreSQL (with PostGIS & pgvector), Redis
-- **Storage**: MinIO (S3-compatible object storage)
-- **Mobile**: Swift/SwiftUI (iOS & macOS)
-- **ML/AI**: NumPy, Ruptures (change detection), HDBSCAN (clustering)
-- **Infrastructure**: Docker, Docker Compose
+**Backend**: Python, Celery, FastAPI, PostgreSQL (PostGIS/pgvector), Redis, MinIO  
+**Frontend**: SvelteKit, TypeScript, TailwindCSS  
+**Mobile**: Swift/SwiftUI (iOS/macOS)  
+**ML/AI**: PELT change detection, HDBSCAN clustering, Vector embeddings
 
 ## 🔧 Development
 
@@ -223,8 +326,6 @@ jaces/
 └── scripts/                   # Utility scripts
 ```
 
-For detailed architecture documentation, see [CLAUDE.md](./CLAUDE.md).
-
 ## 🤝 Contributing
 
 We believe that only an open-source solution to personal data management can truly respect user privacy while covering the long tail of data sources. We welcome contributions in several areas:
@@ -235,10 +336,6 @@ We believe that only an open-source solution to personal data management can tru
 2. **Architecture Reviews**: Share expertise on iOS/Swift, distributed systems, or data processing
 3. **Documentation**: Help others understand and use Jaces effectively
 4. **Bug Reports**: Find something broken? Let us know!
-
-<!-- ### Compensation for Contributors
-
-We're committed to paying for quality contributions. Whether it's code, documentation, or architectural insights, we believe good work deserves compensation. Join our [Discord](https://discord.gg/jaces) to discuss contribution opportunities. -->
 
 ```bash
 # Fork and clone the repository
@@ -276,8 +373,6 @@ See [LICENSE](./LICENSE) for complete details.
 
 ## Axioms
 
-- Headless personal data.
-- The protocol for personal intelligence.
-- An AI with a conscience—yours.
-- Your data should work for you, not against you.
-- We built Jaces with the intent to use AI to increase human agency, not detract from it.
+Headless personal data.
+The protocol for personal intelligence.
+Your data should work for you, not against you.

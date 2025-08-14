@@ -1,0 +1,1 @@
+"""iOS Mic Transcription signal - placeholder for future implementation."""

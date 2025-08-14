@@ -9,26 +9,28 @@ import numpy as np
 import av
 import io
 from sqlalchemy import text
-from sources.base.processing.dedup import generate_source_event_id
+from sources.base.processing.dedup import generate_idempotency_key
 
 
-class MicAudioStreamProcessor:
+class StreamProcessor:
     """Process iOS mic audio stream data."""
     
     def __init__(self):
         self.source_name = "ios"
+        self.stream_name = "ios_mic"
     
     def calculate_audio_level(self, audio_data_base64: str) -> float:
         """
-        Calculate RMS dB level from AAC audio data.
+        Calculate audio level in dB SPL from AAC audio data.
         
-        Decodes AAC audio to PCM using pyav, then calculates RMS level.
+        Decodes AAC audio to PCM using pyav, calculates RMS level in dBFS,
+        then converts to approximate dB SPL by adding 90 dB offset.
         
         Args:
             audio_data_base64: Base64 encoded AAC audio data
             
         Returns:
-            Audio level in dB (range: -60 to 0)
+            Audio level in dB SPL (range: 30 to 90)
         """
         try:
             # Decode base64
@@ -37,8 +39,9 @@ class MicAudioStreamProcessor:
             # Create in-memory file for pyav
             audio_buffer = io.BytesIO(audio_bytes)
             
-            # Open container with pyav
-            container = av.open(audio_buffer, format='caf')  # iOS uses CAF container
+            # Open container with pyav - let it auto-detect format
+            # Real iOS uses CAF, test data uses WAV
+            container = av.open(audio_buffer)
             
             # Get the audio stream
             audio_stream = container.streams.audio[0]
@@ -48,19 +51,25 @@ class MicAudioStreamProcessor:
             
             for frame in container.decode(audio_stream):
                 # Convert audio frame to numpy array
-                # pyav returns normalized float32 samples
                 array = frame.to_ndarray()
                 
                 # Handle multi-channel audio by averaging channels
                 if array.ndim > 1:
                     array = np.mean(array, axis=0)
                 
+                # Check if we have 8-bit unsigned audio (values around 128)
+                # This is common in test data. Real iOS CAF uses different encoding.
+                if array.dtype == np.uint8 or (array.max() > 1.0 and array.mean() > 100):
+                    # Convert 8-bit unsigned (0-255) to normalized float (-1 to 1)
+                    array = (array.astype(np.float32) - 128.0) / 128.0
+                
                 all_samples.extend(array.flatten())
             
             container.close()
             
             if len(all_samples) == 0:
-                return -60.0
+                # Return quiet room level instead of very quiet
+                return 30.0
             
             # Convert to numpy array
             audio_array = np.array(all_samples, dtype=np.float32)
@@ -68,30 +77,30 @@ class MicAudioStreamProcessor:
             # Calculate RMS (Root Mean Square)
             rms = np.sqrt(np.mean(audio_array**2))
             
-            # Convert to dB
+            # Convert to dBFS (digital level)
             if rms > 0:
                 # pyav returns normalized samples, so max value is 1.0
-                db = 20 * np.log10(rms)
+                dbfs = 20 * np.log10(rms)
             else:
-                db = -60.0  # Silent
+                dbfs = -60.0  # Silent
                 
-            # Clamp to reasonable range
-            return max(min(db, 0.0), -60.0)
+            # Clamp dBFS to reasonable range
+            dbfs = max(min(dbfs, 0.0), -60.0)
+            
+            # Convert dBFS to approximate dB SPL
+            # Add 90 dB offset: -60 dBFS → 30 dB SPL, 0 dBFS → 90 dB SPL
+            db_spl = dbfs + 90.0
+            
+            return db_spl
             
         except av.AVError as e:
             print(f"Error decoding audio with pyav: {e}")
-            # Try alternative format if CAF fails
-            try:
-                audio_buffer.seek(0)
-                container = av.open(audio_buffer)  # Let pyav auto-detect format
-                # ... rest of processing (could extract to helper method)
-                return -40.0
-            except:
-                return -40.0
+            # Return a default quiet room level on error
+            return 50.0  # 50 dB SPL - quiet room
         except Exception as e:
             print(f"Error calculating audio level: {e}")
-            # Return a default quiet level on error
-            return -40.0
+            # Return a default quiet room level on error
+            return 50.0  # 50 dB SPL - quiet room
     
     def process(
         self,
@@ -113,23 +122,29 @@ class MicAudioStreamProcessor:
         Returns:
             Processing result with chunk counts
         """
+        print(f"[DEBUG iOS Mic] Processing stream_data with keys: {stream_data.keys()}, stream_name: {self.stream_name}")
+        
         # Extract audio chunks
         chunks = stream_data.get('chunks', [])
         device_id = stream_data.get('device_id')
         batch_metadata = stream_data.get('batch_metadata', {})
         
-        # Check if we have the signal config
-        if 'apple_ios_mic_transcription' not in signal_configs:
+        # Check which signals are configured
+        has_transcription = 'ios_mic_transcription' in signal_configs
+        has_audio_level = 'ios_audio_level' in signal_configs
+        
+        # If neither signal is configured, skip processing
+        if not has_transcription and not has_audio_level:
             return {
                 "status": "skipped",
-                "reason": "apple_ios_mic_transcription signal not configured",
-                "stream_name": "apple_ios_mic_audio",
+                "reason": "No audio signals configured",
+                "stream_name": self.stream_name,
                 "records_processed": 0
             }
         
-        signal_id = signal_configs['apple_ios_mic_transcription']
         chunks_processed = 0
         audio_records_created = 0
+        audio_level_records_created = 0
         
         # Process each audio chunk
         for chunk in chunks:
@@ -157,7 +172,7 @@ class MicAudioStreamProcessor:
                 'id': original_chunk_id,
                 'duration': duration
             }
-            source_event_id = generate_source_event_id('multiple', timestamp_start, chunk_data)
+            idempotency_key = generate_idempotency_key('multiple', timestamp_start, chunk_data)
             
             # Create metadata for the audio chunk
             chunk_metadata = {
@@ -170,66 +185,65 @@ class MicAudioStreamProcessor:
                 'batch_info': batch_metadata
             }
             
-            # Create a placeholder signal for the audio chunk
-            # The actual transcription will be added later
-            db.execute(
-                text("""
-                    INSERT INTO signals 
-                    (id, signal_id, source_name, timestamp, 
-                     confidence, signal_name, signal_value, source_event_id, 
-                     source_metadata, created_at, updated_at)
-                    VALUES (:id, :signal_id, :source_name, :timestamp, 
-                            :confidence, :signal_name, :signal_value, :source_event_id, 
-                            :source_metadata, :created_at, :updated_at)
-                    ON CONFLICT (source_name, source_event_id, signal_name) DO NOTHING
-                """),
-                {
-                    "id": str(uuid4()),
-                    "signal_id": signal_id,
-                    "source_name": self.source_name,
-                    "timestamp": timestamp_start,
-                    "confidence": 0.9,  # Initial confidence, will be updated after transcription
-                    "signal_name": "apple_ios_mic_transcription",
-                    "signal_value": f"[Audio chunk {original_chunk_id}: {duration}ms, processing...]",
-                    "source_event_id": source_event_id,
-                    "source_metadata": json.dumps(chunk_metadata),
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
-                }
-            )
-            
-            audio_records_created += 1
+            # Create a placeholder signal for transcription if configured
+            if has_transcription:
+                db.execute(
+                    text("""
+                        INSERT INTO signals 
+                        (id, signal_id, source_name, timestamp, 
+                         confidence, signal_name, signal_value, idempotency_key, 
+                         source_metadata, created_at, updated_at)
+                        VALUES (:id, :signal_id, :source_name, :timestamp, 
+                                :confidence, :signal_name, :signal_value, :idempotency_key, 
+                                :source_metadata, :created_at, :updated_at)
+                        ON CONFLICT (source_name, idempotency_key, signal_name) DO NOTHING
+                    """),
+                    {
+                        "id": str(uuid4()),
+                        "signal_id": signal_configs['ios_mic_transcription'],
+                        "source_name": self.source_name,
+                        "timestamp": timestamp_start,
+                        "confidence": 0.9,  # Initial confidence, will be updated after transcription
+                        "signal_name": "ios_mic_transcription",
+                        "signal_value": f"[Audio chunk {original_chunk_id}: {duration}ms, processing...]",
+                        "idempotency_key": idempotency_key,
+                        "source_metadata": json.dumps(chunk_metadata),
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                )
+                audio_records_created += 1
             
             # Process audio level if signal is configured
-            if 'apple_ios_audio_level' in signal_configs:
+            if 'ios_audio_level' in signal_configs:
                 try:
                     # Calculate audio level from the chunk
                     audio_level_db = self.calculate_audio_level(chunk.get('audio_data', ''))
                     
                     # Generate source event ID for audio level (single value per timestamp)
-                    audio_level_event_id = generate_source_event_id('single', timestamp_start, {})
+                    audio_level_event_id = generate_idempotency_key('single', timestamp_start, {})
                     
                     # Create audio level signal
                     db.execute(
                         text("""
                             INSERT INTO signals 
                             (id, signal_id, source_name, timestamp, 
-                             confidence, signal_name, signal_value, source_event_id, 
+                             confidence, signal_name, signal_value, idempotency_key, 
                              source_metadata, created_at, updated_at)
                             VALUES (:id, :signal_id, :source_name, :timestamp, 
-                                    :confidence, :signal_name, :signal_value, :source_event_id, 
+                                    :confidence, :signal_name, :signal_value, :idempotency_key, 
                                     :source_metadata, :created_at, :updated_at)
-                            ON CONFLICT (source_name, source_event_id, signal_name) DO NOTHING
+                            ON CONFLICT (source_name, idempotency_key, signal_name) DO NOTHING
                         """),
                         {
                             "id": str(uuid4()),
-                            "signal_id": signal_configs['apple_ios_audio_level'],
+                            "signal_id": signal_configs['ios_audio_level'],
                             "source_name": self.source_name,
                             "timestamp": timestamp_start,
                             "confidence": 0.95,
-                            "signal_name": "apple_ios_audio_level",
+                            "signal_name": "ios_audio_level",
                             "signal_value": str(round(audio_level_db, 1)),
-                            "source_event_id": audio_level_event_id,
+                            "idempotency_key": audio_level_event_id,
                             "source_metadata": json.dumps({
                                 'device_id': device_id,
                                 'chunk_duration_seconds': duration / 1000.0,
@@ -241,6 +255,7 @@ class MicAudioStreamProcessor:
                             "updated_at": datetime.utcnow()
                         }
                     )
+                    audio_level_records_created += 1
                 except Exception as e:
                     print(f"Failed to process audio level for chunk {original_chunk_id}: {e}")
             
@@ -257,10 +272,13 @@ class MicAudioStreamProcessor:
         
         return {
             "status": "success",
-            "stream_name": "apple_ios_mic_audio",
+            "stream_name": self.stream_name,
             "records_processed": len(chunks),
-            "chunks_processed": chunks_processed,
-            "audio_records_created": audio_records_created,
-            "note": "Audio chunks stored, transcription pending"
+            "signals_created": {
+                "ios_audio_level": audio_level_records_created,
+                "ios_mic_transcription": audio_records_created
+            },
+            "total_signals": audio_level_records_created + audio_records_created,
+            "batch_metadata": batch_metadata
         }
 

@@ -3,7 +3,7 @@
     let { children, className = "" } = $props();
 </script>
 
-<div class={twMerge("page-container p-8", className)}>
+<div class={twMerge("page-container p-12", className)}>
     {@render children()}
 </div>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Page } from "$lib/components";
+    import { Page, Spinner } from "$lib/components";
     import type { PageData } from "./$types";
     import { tick, untrack, onMount } from "svelte";
     import { browser } from "$app/environment";
@@ -16,33 +16,47 @@
 
     let mapContainer = $state<HTMLDivElement>();
     let map = $state<any>();
-    let loading = $state(false);
     let error = $state<string | null>(null);
     let timelineContainerWidth = $state(0);
     let timelineContainer = $state<HTMLDivElement>();
     let hoverMarker = $state<any>(null);
     
     // State for date selection
-    let selectedDate = $state(
-        data.selectedDate
-            ? new Date(data.selectedDate).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
-    );
+    let selectedDate = $state(data.selectedDate);
 
-    // Create a reactive async function for map initialization
-    async function initializeMap() {
+    // Fetch location data from API
+    async function fetchLocationData() {
+        const response = await fetch(`/api/location?date=${selectedDate}&timezone=${data.userTimezone}`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to load location data');
+        }
+        const result = await response.json();
+        return result.coordinateSignals;
+    }
+
+    // Create the data promise
+    let dataPromise = $state(fetchLocationData());
+
+    // Refresh data when date changes
+    function handleDateChange() {
+        const url = new URL(window.location.href);
+        url.searchParams.set("date", selectedDate);
+        window.location.href = url.toString();
+    }
+
+    // Initialize map with data
+    async function initializeMap(coordinateSignals: any[]) {
         if (
             !browser ||
             !mapContainer ||
-            !data.coordinateSignals ||
-            data.coordinateSignals.length <= 1
+            !coordinateSignals ||
+            coordinateSignals.length <= 1
         ) {
             return;
         }
 
         try {
-            loading = true;
-
             // Dynamically import Leaflet only on the client side
             const L = (await import("leaflet")).default;
             await import("leaflet/dist/leaflet.css");
@@ -72,7 +86,7 @@
             ).addTo(leafletMap);
 
             // Convert coordinates to Leaflet format (lat, lng)
-            const latLngs = data.coordinateSignals.map((signal) =>
+            const latLngs = coordinateSignals.map((signal) =>
                 L.latLng(signal.coordinates[1], signal.coordinates[0]),
             );
 
@@ -92,52 +106,28 @@
             });
 
             console.log("Map initialized successfully");
-            loading = false;
         } catch (err) {
             console.error("Failed to initialize map:", err);
             error = err instanceof Error ? err.message : "Failed to load map";
-            loading = false;
         }
     }
 
-    // Use $effect to manage the map lifecycle
-    $effect(() => {
-        // Track dependencies
-        const container = mapContainer;
-        const signals = data.coordinateSignals;
-
-        if (container && signals && signals.length > 1) {
-            // Initialize map without tracking to avoid re-runs
-            untrack(() => {
-                initializeMap();
-            });
-        }
-
-        // Cleanup function
-        return () => {
-            if (map && map.remove) {
-                map.remove();
-                map = null;
-            }
-        };
-    });
-
     // Binary search to find the nearest location point by timestamp
-    function findNearestLocation(targetTime: Date) {
-        if (!data.coordinateSignals || data.coordinateSignals.length === 0) {
+    function findNearestLocation(coordinateSignals: any[], targetTime: Date) {
+        if (!coordinateSignals || coordinateSignals.length === 0) {
             return null;
         }
 
         const targetMs = targetTime.getTime();
         let left = 0;
-        let right = data.coordinateSignals.length - 1;
+        let right = coordinateSignals.length - 1;
         let nearest = 0;
         let minDiff = Infinity;
 
         while (left <= right) {
             const mid = Math.floor((left + right) / 2);
             const midTime = new Date(
-                data.coordinateSignals[mid].timestamp,
+                coordinateSignals[mid].timestamp,
             ).getTime();
             const diff = Math.abs(midTime - targetMs);
 
@@ -153,42 +143,44 @@
             }
         }
 
-        return data.coordinateSignals[nearest];
+        return coordinateSignals[nearest];
     }
 
     // Update hover marker position
-    async function updateHoverMarker(hoveredTime: Date | null) {
-        if (!map || !hoveredTime || !browser) return;
+    async function updateHoverMarker(coordinateSignals: any[]) {
+        return async (hoveredTime: Date | null) => {
+            if (!map || !hoveredTime || !browser) return;
 
-        const nearestLocation = findNearestLocation(hoveredTime);
-        if (!nearestLocation) {
-            if (hoverMarker) {
-                map.removeLayer(hoverMarker);
-                hoverMarker = null;
+            const nearestLocation = findNearestLocation(coordinateSignals, hoveredTime);
+            if (!nearestLocation) {
+                if (hoverMarker) {
+                    map.removeLayer(hoverMarker);
+                    hoverMarker = null;
+                }
+                return;
             }
-            return;
-        }
 
-        const L = (await import("leaflet")).default;
-        const latLng = L.latLng(
-            nearestLocation.coordinates[1],
-            nearestLocation.coordinates[0],
-        );
+            const L = (await import("leaflet")).default;
+            const latLng = L.latLng(
+                nearestLocation.coordinates[1],
+                nearestLocation.coordinates[0],
+            );
 
-        if (!hoverMarker) {
-            // Create a new marker
-            hoverMarker = L.circleMarker(latLng, {
-                radius: 8,
-                fillColor: "#2563eb",
-                color: "#1e40af",
-                weight: 2,
-                opacity: 1,
-                fillOpacity: 0.8,
-            }).addTo(map);
-        } else {
-            // Update existing marker position
-            hoverMarker.setLatLng(latLng);
-        }
+            if (!hoverMarker) {
+                // Create a new marker
+                hoverMarker = L.circleMarker(latLng, {
+                    radius: 8,
+                    fillColor: "#2563eb",
+                    color: "#1e40af",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8,
+                }).addTo(map);
+            } else {
+                // Update existing marker position
+                hoverMarker.setLatLng(latLng);
+            }
+        };
     }
 
     // Observe timeline container width
@@ -208,6 +200,31 @@
             resizeObserver.disconnect();
         };
     });
+
+    // Cleanup map on unmount
+    $effect(() => {
+        return () => {
+            if (map && map.remove) {
+                map.remove();
+                map = null;
+            }
+        };
+    });
+
+    // Custom action to initialize map when element is ready
+    function initMap(node: HTMLElement, coordinateSignals: any[]) {
+        // Initialize map when element is ready
+        initializeMap(coordinateSignals);
+        
+        return {
+            update(newCoordinateSignals: any[]) {
+                // Handle updates if needed
+            },
+            destroy() {
+                // Cleanup handled by $effect
+            }
+        };
+    }
 </script>
 
 <Page>
@@ -220,12 +237,7 @@
             <input
                 type="date"
                 bind:value={selectedDate}
-                onchange={() => {
-                    // Update URL with selected date and reload page to fetch new data
-                    const url = new URL(window.location.href);
-                    url.searchParams.set("date", selectedDate);
-                    window.location.href = url.toString();
-                }}
+                onchange={handleDateChange}
                 class="border border-neutral-300 bg-white rounded-lg px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-neutral-500 focus:border-neutral-500 transition-all"
             />
             <p class="text-neutral-700">
@@ -234,93 +246,93 @@
         </div>
 
         <div class="mt-6">
-            {#if error}
-                <div class="p-4 bg-red-50 text-red-800 rounded-lg">
-                    <p class="font-bold">Error loading map</p>
-                    <p class="text-sm">{error}</p>
+            {#await dataPromise}
+                <!-- Loading state -->
+                <div class="flex flex-col items-center justify-center h-96 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <Spinner size="lg" />
+                    <p class="mt-4 text-neutral-600 animate-pulse">Loading location data...</p>
                 </div>
-            {:else if !data.coordinateSignals || data.coordinateSignals.length === 0}
-                <div
-                    class="flex items-center justify-center h-64 bg-gray-50 rounded-lg"
-                >
-                    <p class="text-gray-500">
-                        No location data found for {selectedDate}.
-                    </p>
-                </div>
-            {:else if data.coordinateSignals.length === 1}
-                <div
-                    class="flex items-center justify-center h-64 bg-gray-50 rounded-lg"
-                >
-                    <p class="text-gray-500">
-                        Only one location point found. Need at least 2 points to
-                        draw a path.
-                    </p>
-                </div>
-            {:else}
-                <!-- Timeline card -->
-                <div
-                    bind:this={timelineContainer}
-                    class="rounded-lg border border-neutral-200 bg-white mb-4"
-                    style="height: 60px; position: relative; overflow: visible;"
-                >
-                    {#if timelineContainerWidth > 0}
-                        <TimelineContext
-                            selectedDate={data.selectedDate}
-                            containerWidth={timelineContainerWidth}
-                            padding={0}
-                            userTimezone={data.userTimezone}
-                        >
-                            <div class="relative w-full" style="height: 60px;">
-                                <TimelineGrid
-                                    selectedDate={data.selectedDate}
-                                    userTimezone={data.userTimezone}
-                                />
-
-                                <!-- Location data availability indicator -->
-                                <LocationDataIndicator
-                                    coordinateSignals={data.coordinateSignals}
-                                    selectedDate={data.selectedDate}
-                                    userTimezone={data.userTimezone}
-                                />
-
-                                <div
-                                    class="absolute inset-0 pointer-events-none"
-                                >
-                                    <TimelineLegend
+            {:then coordinateSignals}
+                {#if !coordinateSignals || coordinateSignals.length === 0}
+                    <div
+                        class="flex items-center justify-center h-64 bg-gray-50 rounded-lg"
+                    >
+                        <p class="text-gray-500">
+                            No location data found for {selectedDate}.
+                        </p>
+                    </div>
+                {:else if coordinateSignals.length === 1}
+                    <div
+                        class="flex items-center justify-center h-64 bg-gray-50 rounded-lg"
+                    >
+                        <p class="text-gray-500">
+                            Only one location point found. Need at least 2 points to
+                            draw a path.
+                        </p>
+                    </div>
+                {:else}
+                    <!-- Timeline card -->
+                    <div
+                        bind:this={timelineContainer}
+                        class="rounded-lg border border-neutral-200 bg-white mb-4"
+                        style="height: 60px; position: relative; overflow: visible;"
+                    >
+                        {#if timelineContainerWidth > 0}
+                            <TimelineContext
+                                selectedDate={data.selectedDate}
+                                containerWidth={timelineContainerWidth}
+                                padding={0}
+                                userTimezone={data.userTimezone}
+                            >
+                                <div class="relative w-full" style="height: 60px;">
+                                    <TimelineGrid
                                         selectedDate={data.selectedDate}
                                         userTimezone={data.userTimezone}
                                     />
-                                </div>
-                                <TimelineCursor />
-                            </div>
-                            <TimelineHoverWatcher
-                                onHoverChange={updateHoverMarker}
-                            />
-                        </TimelineContext>
-                    {/if}
-                </div>
 
-                <!-- Map container -->
-                <div class="relative">
-                    {#if loading}
+                                    <!-- Location data availability indicator -->
+                                    <LocationDataIndicator
+                                        {coordinateSignals}
+                                        selectedDate={data.selectedDate}
+                                        userTimezone={data.userTimezone}
+                                    />
+
+                                    <div
+                                        class="absolute inset-0 pointer-events-none"
+                                    >
+                                        <TimelineLegend
+                                            selectedDate={data.selectedDate}
+                                            userTimezone={data.userTimezone}
+                                        />
+                                    </div>
+                                    <TimelineCursor />
+                                </div>
+                                <TimelineHoverWatcher
+                                    onHoverChange={updateHoverMarker(coordinateSignals)}
+                                />
+                            </TimelineContext>
+                        {/if}
+                    </div>
+
+                    <!-- Map container -->
+                    <div class="relative">
                         <div
-                            class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10"
-                        >
-                            <p class="text-gray-500 animate-pulse">
-                                Loading map...
-                            </p>
-                        </div>
-                    {/if}
-                    <div
-                        bind:this={mapContainer}
-                        class="rounded-lg border border-neutral-200"
-                        style="height: 32rem;"
-                    ></div>
+                            bind:this={mapContainer}
+                            class="rounded-lg border border-neutral-200 bg-neutral-50"
+                            style="height: 32rem;"
+                            use:initMap={coordinateSignals}
+                        ></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Found {coordinateSignals.length.toLocaleString()} location points
+                    </p>
+                {/if}
+            {:catch error}
+                <div class="p-4 bg-red-50 text-red-800 rounded-lg">
+                    <p class="font-bold">Error loading location data</p>
+                    <p class="text-sm">{error.message || error}</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-2">
-                    Found {data.coordinateSignals.length} location points
-                </p>
-            {/if}
+            {/await}
         </div>
     </div>
 </Page>

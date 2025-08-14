@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 from uuid import uuid4
 import json
 from sqlalchemy import text
-from sources.base.processing.dedup import generate_source_event_id
+from sources.base.processing.dedup import generate_idempotency_key
 
 
 class MacAppActivityStreamProcessor:
@@ -78,7 +78,7 @@ class MacAppActivityStreamProcessor:
                 'bundle_id': bundle_id,
                 'event_type': signal_type
             }
-            source_event_id = generate_source_event_id('single', timestamp, event_data)
+            idempotency_key = generate_idempotency_key('single', timestamp, event_data)
             
             # Determine signal name based on event type
             signal_type = event.get('signalType', 'unknown')
@@ -110,12 +110,12 @@ class MacAppActivityStreamProcessor:
                 text("""
                     INSERT INTO signals 
                     (id, signal_id, source_name, timestamp, 
-                     confidence, signal_name, signal_value, source_event_id, 
+                     confidence, signal_name, signal_value, idempotency_key, 
                      source_metadata, created_at, updated_at)
                     VALUES (:id, :signal_id, :source_name, :timestamp, 
-                            :confidence, :signal_name, :signal_value, :source_event_id, 
+                            :confidence, :signal_name, :signal_value, :idempotency_key, 
                             :source_metadata, :created_at, :updated_at)
-                    ON CONFLICT (source_name, source_event_id, signal_name) DO NOTHING
+                    ON CONFLICT (source_name, idempotency_key, signal_name) DO NOTHING
                 """),
                 {
                     "id": str(uuid4()),
@@ -125,7 +125,7 @@ class MacAppActivityStreamProcessor:
                     "confidence": 0.95,  # High confidence for direct app events
                     "signal_name": "apple_mac_apps",
                     "signal_value": signal_value,
-                    "source_event_id": source_event_id,
+                    "idempotency_key": idempotency_key,
                     "source_metadata": json.dumps(metadata),
                     "created_at": datetime.utcnow(),
                     "updated_at": datetime.utcnow()

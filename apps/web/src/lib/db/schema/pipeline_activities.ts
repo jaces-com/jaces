@@ -1,6 +1,6 @@
 import { pgTable, uuid, varchar, integer, timestamp, text, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
 import { signalConfigs } from './signal_configs';
-import { streamConfigs } from './stream_configs';
+import { streams } from './streams';
 import { users } from './users';
 
 // Create enum for activity types
@@ -32,7 +32,7 @@ export const pipelineActivities = pgTable('pipeline_activities', {
 
   // Related entities (nullable based on activity type)
   streamId: uuid('stream_id')
-    .references(() => streamConfigs.id, { onDelete: 'set null' }),
+    .references(() => streams.id, { onDelete: 'set null' }),
   signalId: uuid('signal_id')
     .references(() => signalConfigs.id, { onDelete: 'set null' }),
   sourceName: varchar('source_name').notNull(),

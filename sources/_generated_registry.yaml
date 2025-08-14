@@ -1,5 +1,10 @@
+# AUTO-GENERATED DOCUMENTATION - DO NOT EDIT MANUALLY
+# Generated from distributed YAML configurations in sources/
+# For reference only - runtime code uses database as source of truth
+# Run 'make registry' or 'python scripts/generate_registry.py' to regenerate
+
 version: 2.0.0
-generated_at: '2025-08-11T13:00:46.333201'
+generated_at: '2025-08-14T11:06:25.367575'
 sources:
   google:
     path: google/
@@ -307,6 +312,7 @@ streams:
       format: binary
     signals:
     - ios_audio_level
+    - ios_mic_transcription
     semantics: []
     sync_module: sources.ios.mic.sync
     sync_class: IosMicSync
@@ -402,6 +408,8 @@ signals:
       algorithm: event_detection
       analysis_type: categorical
       value_type: event
+      detector_class: CalendarEventsTransitionDetector
+      detector_module: sources.google.calendar.events.detector
     weight:
       macro: 0.7
       micro: 0.65
@@ -419,7 +427,6 @@ signals:
     schedule:
       cron: '*/15 * * * *'
       priority: medium
-    detector: sources.google.calendar.events
   ios_active_energy:
     source: ios
     stream: ios_healthkit
@@ -443,6 +450,8 @@ signals:
       penalty_multiplier: 1.2
       gap_threshold_seconds: 1800
       aggregation: sum
+      detector_class: ActiveEnergyTransitionDetector
+      detector_module: sources.ios.healthkit.active_energy.detector
     weight:
       macro: 0.7
       micro: 0.65
@@ -455,7 +464,6 @@ signals:
     schedule:
       cron: '*/10 * * * *'
       priority: medium
-    detector: sources.ios.healthkit.active_energy
   ios_sleep:
     source: ios
     stream: ios_healthkit
@@ -478,6 +486,8 @@ signals:
       - rem
       min_segment_size: 30
       gap_threshold_seconds: 7200
+      detector_class: SleepTransitionDetector
+      detector_module: sources.ios.healthkit.sleep.detector
     weight:
       macro: 0.9
       micro: 0.85
@@ -489,7 +499,6 @@ signals:
     schedule:
       cron: 0 */1 * * *
       priority: low
-    detector: sources.ios.healthkit.sleep
   ios_workouts:
     source: ios
     stream: ios_healthkit
@@ -513,6 +522,8 @@ signals:
       - strength
       - yoga
       - other
+      detector_class: WorkoutsTransitionDetector
+      detector_module: sources.ios.healthkit.workouts.detector
     weight:
       macro: 0.85
       micro: 0.8
@@ -524,7 +535,6 @@ signals:
     schedule:
       cron: '*/10 * * * *'
       priority: medium
-    detector: sources.ios.healthkit.workouts
   ios_heart_rate_variability:
     source: ios
     stream: ios_healthkit
@@ -547,6 +557,8 @@ signals:
       min_segment_size: 10
       penalty_multiplier: 2.0
       gap_threshold_seconds: 3600
+      detector_class: HeartRateVariabilityTransitionDetector
+      detector_module: sources.ios.healthkit.heart_rate_variability.detector
     weight:
       macro: 0.6
       micro: 0.5
@@ -559,7 +571,6 @@ signals:
     schedule:
       cron: '*/15 * * * *'
       priority: low
-    detector: sources.ios.healthkit.heart_rate_variability
   ios_heart_rate:
     source: ios
     stream: ios_healthkit
@@ -582,6 +593,8 @@ signals:
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 600
+      detector_class: HeartRateTransitionDetector
+      detector_module: sources.ios.healthkit.heart_rate.detector
     weight:
       macro: 0.85
       micro: 0.8
@@ -600,7 +613,6 @@ signals:
     schedule:
       cron: '*/5 * * * *'
       priority: high
-    detector: sources.ios.healthkit.heart_rate
   ios_steps:
     source: ios
     stream: ios_healthkit
@@ -624,6 +636,8 @@ signals:
       penalty_multiplier: 1.0
       gap_threshold_seconds: 1800
       aggregation: sum
+      detector_class: StepsTransitionDetector
+      detector_module: sources.ios.healthkit.steps.detector
     weight:
       macro: 0.75
       micro: 0.7
@@ -641,7 +655,6 @@ signals:
     schedule:
       cron: '*/10 * * * *'
       priority: medium
-    detector: sources.ios.healthkit.steps
   ios_coordinates:
     source: ios
     stream: ios_location
@@ -663,6 +676,8 @@ signals:
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 1200
+      detector_class: CoordinatesTransitionDetector
+      detector_module: sources.ios.location.coordinates.detector
     weight:
       macro: 1.0
       micro: 0.95
@@ -681,7 +696,6 @@ signals:
     schedule:
       cron: '*/5 * * * *'
       priority: high
-    detector: sources.ios.location.coordinates
   ios_speed:
     source: ios
     stream: ios_location
@@ -704,6 +718,8 @@ signals:
       min_segment_size: 5
       penalty_multiplier: 1.2
       gap_threshold_seconds: 900
+      detector_class: SpeedTransitionDetector
+      detector_module: sources.ios.location.speed.detector
     weight:
       macro: 0.8
       micro: 0.7
@@ -719,7 +735,6 @@ signals:
     schedule:
       cron: '*/5 * * * *'
       priority: medium
-    detector: sources.ios.location.speed
   ios_altitude:
     source: ios
     stream: ios_location
@@ -742,6 +757,8 @@ signals:
       min_segment_size: 5
       penalty_multiplier: 1.0
       gap_threshold_seconds: 900
+      detector_class: AltitudeTransitionDetector
+      detector_module: sources.ios.location.altitude.detector
     weight:
       macro: 0.6
       micro: 0.5
@@ -757,7 +774,6 @@ signals:
     schedule:
       cron: '*/5 * * * *'
       priority: medium
-    detector: sources.ios.location.altitude
   ios_audio_level:
     source: ios
     stream: ios_mic
@@ -780,6 +796,8 @@ signals:
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 600
+      detector_class: AudioLevelTransitionDetector
+      detector_module: sources.ios.mic.audio_level.detector
     weight:
       macro: 0.5
       micro: 0.4
@@ -792,7 +810,26 @@ signals:
     schedule:
       cron: '*/5 * * * *'
       priority: low
-    detector: sources.ios.mic.audio_level
+  ios_mic_transcription:
+    source: ios
+    stream: ios_mic
+    path: ios/mic/mic_transcription/
+    display_name: Voice Transcription
+    description: Transcribed text from microphone audio chunks
+    unit:
+      ucum: '{text}'
+      display: text
+    value_type: continuous
+    algorithm: pelt
+    cost_function: l2
+    computation:
+      detector_class: MicTranscriptionTransitionDetector
+      detector_module: sources.ios.mic.mic_transcription.detector
+    weight: {}
+    transitions: {}
+    zones: {}
+    metadata: {}
+    schedule: {}
   mac_app_activity:
     source: mac
     stream: mac_apps
@@ -815,6 +852,8 @@ signals:
       min_segment_size: 10
       penalty_multiplier: 1.5
       gap_threshold_seconds: 300
+      detector_class: ActivityTransitionDetector
+      detector_module: sources.mac.apps.activity.detector
     weight:
       macro: 0.75
       micro: 0.7
@@ -832,7 +871,6 @@ signals:
     schedule:
       cron: '*/15 * * * *'
       priority: high
-    detector: sources.mac.apps.activity
 semantics:
   notion_pages_page:
     source: notion
@@ -886,6 +924,9 @@ transition_detectors:
   ios_audio_level:
     module: sources.ios.mic.audio_level
     class: AudioLevelTransitionDetector
+  ios_mic_transcription:
+    module: sources.ios.mic.mic_transcription
+    class: MicTranscriptionTransitionDetector
   mac_app_activity:
     module: sources.mac.apps.activity
     class: ActivityTransitionDetector

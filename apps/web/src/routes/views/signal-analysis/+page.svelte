@@ -7,7 +7,7 @@
 		TimelineLegend,
 		TimelineCursor,
 	} from "$lib/components/signal-analysis";
-	import { HDBSCANEventVisualization } from "$lib/components/signal-analysis/visualizations";
+	import { EventVisualization } from "$lib/components/signal-analysis/visualizations";
 	import { invalidate } from "$app/navigation";
 	import type { PageData } from "./$types";
 
@@ -32,6 +32,53 @@
 
 	// Source timelines from server data - derived from data prop
 	let sourceTimelines = $derived(processServerData());
+
+	// Transform HDBSCAN events to EventVisualization format
+	function transformHDBSCANEventsToSignals(events: any[]) {
+		if (!events || events.length === 0) return [];
+		
+		return events.map((event, index) => {
+			const startTime = new Date(event.startTime);
+			const endTime = new Date(event.endTime);
+			const duration = endTime.getTime() - startTime.getTime();
+			
+			// Generate event summary
+			let summary = `Event ${index + 1}`;
+			if (event.signalContributions && Object.keys(event.signalContributions).length > 0) {
+				// Find dominant signal
+				const [dominantSignal] = Object.entries(event.signalContributions)
+					.sort(([,a], [,b]) => (b as number) - (a as number))[0];
+				if (dominantSignal) {
+					summary = dominantSignal[0].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+				}
+			}
+			
+			return {
+				timestamp: startTime,
+				value: summary,
+				label: summary,
+				duration: duration,
+				metadata: {
+					event: {
+						id: event.id,
+						clusterId: event.clusterId,
+						confidence: event.metadata?.avg_confidence || event.coreDensity || 0.5,
+						clusterSize: event.clusterSize,
+						eventType: event.eventType,
+						signalContributions: event.signalContributions
+					},
+					timing: {
+						start: startTime,
+						end: endTime,
+						duration_minutes: duration / (60 * 1000)
+					}
+				}
+			};
+		});
+	}
+	
+	// Transform HDBSCAN events for visualization
+	let hdbscanEventSignals = $derived(transformHDBSCANEventsToSignals(data.hdbscanEvents));
 
 	// Process real data from server
 	function processServerData() {
@@ -296,11 +343,12 @@
 			});
 		}
 
-		// Add transitions data to ambient signals
+		// Add transitions data to all signal types
 		if (data.signalTransitionsBySource) {
 			timelines = timelines.map((source) => {
-				// For ambient signals, check for transitions
-				if (source.type === "ambient") {
+				// Check for transitions for all signal types (continuous, ambient, event)
+				// Note: transitions are keyed by signal_name (e.g., "ios_speed", "google_calendar_events")
+				if (source.type === "continuous" || source.type === "ambient" || source.type === "event") {
 					const transitions =
 						data.signalTransitionsBySource?.[source.name] || [];
 
@@ -312,6 +360,11 @@
 								transitionTime: new Date(
 									transition.transitionTime,
 								),
+								transitionType: transition.transitionType || 'changepoint',
+								changeMagnitude: transition.changeMagnitude,
+								changeDirection: transition.changeDirection,
+								beforeMean: transition.beforeMean,
+								afterMean: transition.afterMean,
 								fromState: transition.fromState,
 								toState: transition.toState,
 								confidence: transition.confidence || 0.8,
@@ -527,7 +580,7 @@
 
 		<!-- Signal Analysis Card -->
 		<div
-			class="border border-neutral-200 rounded-lg bg-white overflow-visible"
+			class="border border-neutral-200 rounded-lg bg-white overflow-hidden"
 		>
 			<!-- Header and content with padding -->
 			<div class="p-6 pb-0">
@@ -542,7 +595,7 @@
 			</div>
 
 			<!-- Full-width timeline section -->
-			<div bind:this={detectionTimelineContainer} class="relative w-full">
+			<div bind:this={detectionTimelineContainer} class="relative w-full overflow-hidden">
 				{#if detectionContainerWidth > 0}
 					<TimelineContext
 						{selectedDate}
@@ -550,58 +603,54 @@
 						padding={0}
 						userTimezone={data.userTimezone}
 					>
-						<div class="relative w-full" style="min-height: 200px;">
-							<!-- Timeline Grid -->
-							<TimelineGrid
-								{selectedDate}
-								userTimezone={data.userTimezone}
-							/>
-
-							<!-- HDBSCAN Events Visualization -->
-							{#if data.hdbscanEvents && data.hdbscanEvents.length > 0}
-								<div class="px-6 pt-4">
-									<HDBSCANEventVisualization
-										events={data.hdbscanEvents.map((e) => ({
-											...e,
-											startTime: new Date(e.startTime),
-											endTime: new Date(e.endTime),
-										}))}
-										transitions={Object.values(
-											data.signalTransitionsBySource ||
-												{},
-										)
-											.flat()
-											.map((t) => ({
-												...t,
-												transitionTime: new Date(
-													t.transitionTime,
-												),
-											}))}
-										{selectedDate}
-										userTimezone={data.userTimezone}
-									/>
-								</div>
-							{:else}
-								<div class="px-6 pt-4 pb-6">
-									<p class="text-sm text-neutral-500 italic">
-										No events detected yet. Events are automatically
-										generated from signal transitions.
-									</p>
-								</div>
-							{/if}
-
-							<!-- Timeline Legend -->
-							<div
-								class="h-8 pointer-events-none relative w-full mt-6"
-							>
-								<TimelineLegend
+						<div class="relative">
+							<!-- Single Timeline Grid overlay for entire area -->
+							<div class="absolute inset-0 pointer-events-none z-0">
+								<TimelineGrid
 									{selectedDate}
 									userTimezone={data.userTimezone}
 								/>
 							</div>
 
-							<!-- Timeline Cursor -->
-							<TimelineCursor />
+							<!-- Content wrapper with proper z-index -->
+							<div class="relative z-10">
+								<!-- Timeline Legend at the top -->
+								<div class="h-8 pointer-events-none relative w-full mb-2">
+									<TimelineLegend
+										{selectedDate}
+										userTimezone={data.userTimezone}
+									/>
+								</div>
+
+								<!-- HDBSCAN Events Section -->
+								<div class="bg-transparent">
+									<div class="flex items-center gap-2 px-4 h-8 border-b border-neutral-200">
+										<span class="text-[10px] font-semibold text-neutral-700 font-mono">Detected Events</span>
+										<span class="text-[10px] text-neutral-500">
+											({hdbscanEventSignals.length})
+										</span>
+									</div>
+
+									{#if hdbscanEventSignals.length > 0}
+										<div class="relative my-4" style="min-height: 60px;">
+											<EventVisualization
+												signals={hdbscanEventSignals}
+												height={60}
+											/>
+										</div>
+									{:else}
+										<div class="flex flex-col items-center justify-center p-6 text-neutral-400 text-[13px] gap-2">
+											<p class="text-neutral-500">No events detected yet</p>
+											<p class="text-xs text-neutral-400">
+												Events are automatically generated from signal transitions
+											</p>
+										</div>
+									{/if}
+								</div>
+
+								<!-- Timeline Cursor -->
+								<TimelineCursor />
+							</div>
 						</div>
 					</TimelineContext>
 				{:else}

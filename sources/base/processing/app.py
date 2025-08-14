@@ -3,7 +3,7 @@ Processing service FastAPI application
 """
 import os
 import time
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 import json
@@ -118,6 +118,18 @@ class BoundaryDetectionResponse(BaseModel):
     message: str
 
 
+class TransitionDetectionRequest(BaseModel):
+    date: str
+    run_type: str = "manual"
+    timezone: Optional[str] = None
+
+
+class TransitionDetectionResponse(BaseModel):
+    success: bool
+    task_id: Optional[str] = None
+    message: str
+
+
 class EventGenerationRequest(BaseModel):
     date: str
     min_cluster_size: int = 3
@@ -185,6 +197,57 @@ async def run_signal_analysis(request: BoundaryDetectionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/tasks/transition-detection", response_model=TransitionDetectionResponse)
+async def trigger_transition_detection(request: TransitionDetectionRequest):
+    """
+    Trigger transition detection for a specific date
+    """
+    try:
+        # Use direct Redis connection to queue task
+        import redis
+        import json
+        import uuid
+        from datetime import datetime
+        
+        redis_url = os.getenv('REDIS_URL', 'redis://redis:6379/0')
+        r = redis.from_url(redis_url)
+        
+        # Create task message in Celery format
+        task_id = str(uuid.uuid4())
+        task_message = {
+            'id': task_id,
+            'task': 'start_transition_detection',
+            'args': [
+                request.date,
+                request.run_type,
+                None,  # custom_start_time
+                None,  # custom_end_time
+                request.timezone
+            ],
+            'kwargs': {},
+            'retries': 0,
+            'eta': None,
+            'expires': None,
+        }
+        
+        # Queue to Celery's default queue
+        r.lpush('celery', json.dumps(task_message))
+        
+        return TransitionDetectionResponse(
+            success=True,
+            task_id=task_id,
+            message=f"Transition detection queued for {request.date}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error triggering transition detection: {str(e)}")
+        return TransitionDetectionResponse(
+            success=False,
+            task_id=None,
+            message=str(e)
+        )
+
+
 @app.post("/api/events/generate", response_model=EventGenerationResponse)
 async def generate_events(request: EventGenerationRequest):
     """
@@ -213,7 +276,8 @@ async def generate_events(request: EventGenerationRequest):
                     text("""
                         SELECT 
                             id, source_name, signal_name, transition_time,
-                            from_state, to_state, confidence, detection_method,
+                            transition_type, change_magnitude, change_direction,
+                            before_mean, after_mean, confidence, detection_method,
                             transition_metadata
                         FROM signal_transitions
                         WHERE DATE(transition_time) = :target_date
@@ -266,11 +330,11 @@ async def generate_events(request: EventGenerationRequest):
                 transitions = merge_correlated_transitions(transitions)
                 
                 # Add synthetic transitions at day boundaries
-                # Ensure timezone consistency - transitions from DB might have UTC timezone
-                start_of_day = datetime.combine(target_date, datetime.min.time())
-                end_of_day = datetime.combine(target_date, datetime.max.time())
+                # Create UTC-aware boundaries, then convert to naive for consistency
+                start_of_day = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc).replace(tzinfo=None)
+                end_of_day = datetime.combine(target_date, datetime.max.time(), tzinfo=timezone.utc).replace(tzinfo=None)
                 
-                # Ensure all transitions have consistent timezone handling
+                # Ensure all transitions have consistent timezone handling (naive UTC)
                 for t in transitions:
                     if hasattr(t['transition_time'], 'tzinfo') and t['transition_time'].tzinfo is not None:
                         # Convert to naive datetime if it has timezone info

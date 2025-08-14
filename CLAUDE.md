@@ -8,22 +8,31 @@ Important instruction reminders:
 - NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 - Run commands within the Docker container with docker compose exec.
 
+This is a single-user system where the schema follows an ELT pipeline as:
+
+- source_configs: Global catalog of source types (Google, iOS, etc.)
+- sources: Active source instances (e.g., "My iPhone", "Work Calendar")
+- stream_configs: Global catalog of stream types
+- streams: Active stream instances with settings
+- signal_configs: Global catalog of signal types (reference data)
+- signals: Actual signal data (events/measurements)
+
 ## Monorepo Structure
 
 ``` txt
 jaces/
 ├── apps/                      # 📱 User-facing applications and gateways
-│   ├── google-auth-proxy/     # 🔐 OAuth proxy for all Google services (deployed separately)
+│   ├── oauth-proxy/           # 🔐 OAuth proxy for Google/Notion services (deployed separately)
 │   ├── ios/                   # 🍎 Native iOS application for data collection
 │   ├── mac/                   # 🖥️ Native macOS agent application
 │   └── web/                   # 🌐 SvelteKit frontend web application
 │
 ├── sources/                   # 📦 Single source of truth for all data pipeline logic
-│   ├── base/                  # 🏗️ Shared utilities and infrastructure (formerly services/)
+│   ├── base/                  # 🏗️ Shared utilities and infrastructure
 │   │   ├── auth/              # 🔐 Authentication handlers (OAuth, device tokens)
-│   │   ├── config.py          # ⚙️ Configuration loader (YAML/JSON support)
+│   │   ├── generated_models/  # 📊 Database models (auto-generated from Drizzle)
 │   │   ├── interfaces/        # 📝 Abstract base classes for sources
-│   │   ├── models/            # 📊 Database models (auto-generated from Drizzle)
+│   │   ├── models/            # 🗄️ Legacy database models
 │   │   ├── processing/        # 🏃‍♀️ Data processing and signal analysis
 │   │   ├── scheduler/         # ⏰ Celery app and background tasks
 │   │   ├── storage/           # 💾 MinIO, database, and cache clients
@@ -35,27 +44,27 @@ jaces/
 │   ├── mac/                   # 🖥️ macOS data sources
 │   │   └── apps/              # 💻 Application usage tracking
 │   ├── google/                # 🔍 Google service integrations
-│   │   └── api/               # 📅 Calendar and other APIs
-│   └── _registry.yaml         # 📚 Master registry of all sources/streams/signals
-│
-├── assets/                    # 🎨 Static configuration and resources
-│   ├── config/                # 🔩 Configuration files (YAML primary, JSON fallback)
-│   │   ├── source_configs.yaml   # Source metadata and UI configuration
-│   │   ├── stream_configs.yaml   # Stream definitions and processing rules
-│   │   ├── signal_configs.yaml   # Signal types and processing logic
-│   │   └── defaults.yaml         # System-wide default settings
-│   └── prompts/               # 🗣️ AI prompt templates
+│   │   └── calendar/          # 📅 Calendar events and sync
+│   ├── notion/                # 📝 Notion integration
+│   │   └── pages/             # 📄 Page content sync
+│   ├── _generated_registry.yaml  # 📚 Auto-generated registry of all sources/streams/signals
+│   └── _generated_registry.py    # 🐍 Python version of registry
 │
 ├── scripts/                   # 📜 Utility scripts for development and operations
-│   ├── init-db.sql            # Database initialization
-│   ├── minio-entrypoint.sh    # MinIO container setup
-│   └── deploy-ec2-setup.sh    # Production deployment
+│   ├── init-db.sql            # 🗄️ Database initialization
+│   ├── minio-entrypoint.sh    # 🪣 MinIO container setup
+│   ├── deploy-ec2-setup.sh    # ☁️ Production deployment
+│   ├── generate_registry.py   # 🔄 Generate source registry from YAML configs
+│   └── *.py                   # 🔧 Various utility scripts
 │
+├── docs/                      # 📚 Project documentation
+├── notebooks/                 # 📓 Jupyter notebooks for analysis
 ├── tests/                     # 🧪 E2E tests, integration tests, and test data
 │
 ├── Makefile                   # 🛠️ Simple aliases for common developer commands
 ├── biome.json                 # 💅 Linting and formatting configuration
 ├── docker-compose.yml         # 🚀 Local development stack definition
+├── docker-compose.prod.yml    # 🚢 Production stack configuration
 └── README.md                  # 📖 Project documentation
 ```
 

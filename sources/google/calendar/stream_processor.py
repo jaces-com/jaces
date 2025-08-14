@@ -1,4 +1,4 @@
-"""Generic configuration-driven stream processor that reads from the registry."""
+"""Generic configuration-driven stream processor for Google Calendar."""
 
 from datetime import datetime, timezone as tz
 from typing import Dict, Any, List, Optional
@@ -6,26 +6,25 @@ from uuid import uuid4
 import json
 from pathlib import Path
 from sqlalchemy import text
-from sources.base.processing.dedup import generate_source_event_id
+from sources.base.processing.dedup import generate_idempotency_key
 from sources.base.processing.normalization import DataNormalizer
 from sources.base.processing.validation import DataValidator
 
 
 class StreamProcessor:
     """
-    Generic stream processor that reads configuration from the generated registry.
-    Auto-discovers its stream name and processes signals accordingly.
+    Generic stream processor for Google Calendar events.
+    Configuration passed via signal_configs parameter in process().
     """
     
     def __init__(self, stream_name: Optional[str] = None):
         """
-        Initialize the processor with configuration from the registry.
+        Initialize the processor.
         
         Args:
             stream_name: Optional stream name. If not provided, auto-detects from path.
         """
-        # Import registry (at runtime to get latest generated version)
-        from sources._generated_registry import STREAMS, SIGNALS
+        # Note: Registry no longer used - processor relies on passed signal_configs
         
         # Auto-detect stream name if not provided
         if not stream_name:
@@ -33,27 +32,12 @@ class StreamProcessor:
         
         self.stream_name = stream_name
         
-        # Get stream configuration from registry
-        if stream_name not in STREAMS:
-            raise ValueError(f"Stream '{stream_name}' not found in registry")
-        
-        self.stream_config = STREAMS[stream_name]
-        
-        # Extract processor configuration
-        processor_config = self.stream_config.get('processor_config', {})
-        self.source_name = processor_config.get('source_name', self.stream_config.get('source'))
-        self.stream_type = processor_config.get('stream_type', 'events')
-        self.dedup_strategy = processor_config.get('deduplication_strategy', 'single')
-        self.event_id_fields = processor_config.get('event_id_fields', [])
-        
-        # Get signal configurations from registry
-        # Try both 'signals' and 'produces_signals' for compatibility
-        self.signal_configs = {}
-        signal_names = self.stream_config.get('signals', []) or self.stream_config.get('produces_signals', [])
-        for signal_name in signal_names:
-            if signal_name in SIGNALS:
-                self.signal_configs[signal_name] = SIGNALS[signal_name]
-                print(f"Loaded signal config: {signal_name}")
+        # Configuration will be passed via signal_configs parameter in process()
+        # Set defaults for processor configuration
+        self.source_name = 'google'  # Google Calendar is always from Google source
+        self.stream_type = 'events'
+        self.dedup_strategy = 'single'
+        self.event_id_fields = ['id']  # Google Calendar event ID field
     
     def _detect_stream_name(self) -> str:
         """
@@ -122,14 +106,8 @@ class StreamProcessor:
         # Track signals created per signal type
         signals_created = {}
         
-        # Process for each signal from registry
-        for signal_name, signal_config in self.signal_configs.items():
-            # Check if this signal is configured in the database
-            if signal_name not in signal_configs:
-                print(f"Signal {signal_name} not found in database configs, skipping")
-                continue
-            
-            signal_id = signal_configs[signal_name]
+        # Process for each signal configured in the database
+        for signal_name, signal_id in signal_configs.items():
             count = 0
             
             # Process each event for this signal
@@ -141,7 +119,7 @@ class StreamProcessor:
                 event = event_wrapper.get('event', {})
                 
                 # Apply any filtering rules
-                if not self._should_process_event(event, signal_config):
+                if not self._should_process_event(event, signal_name):
                     print(f"Skipping event {event.get('id', 'unknown')} - failed should_process check")
                     continue
                 
@@ -153,11 +131,11 @@ class StreamProcessor:
                     continue
                 
                 # Extract signal value
-                signal_value = self._extract_signal_value(event, signal_config)
+                signal_value = self._extract_signal_value(event, signal_name)
                 
                 # Generate source event ID using configured fields
                 event_data = self._build_event_data(event, calendar_info)
-                source_event_id = generate_source_event_id(
+                idempotency_key = generate_idempotency_key(
                     self.dedup_strategy, 
                     start_time, 
                     event_data
@@ -167,19 +145,19 @@ class StreamProcessor:
                 metadata = self._build_metadata(event, calendar_info, start_time, end_time)
                 
                 # Calculate confidence
-                confidence = self._calculate_confidence(event, signal_config)
+                confidence = self._calculate_confidence(event, signal_name)
                 
                 # Insert signal
                 db.execute(
                     text("""
                         INSERT INTO signals
                         (id, signal_id, source_name, timestamp,
-                         confidence, signal_name, signal_value, source_event_id,
+                         confidence, signal_name, signal_value, idempotency_key,
                          source_metadata, created_at, updated_at)
                         VALUES (:id, :signal_id, :source_name, :timestamp,
-                                :confidence, :signal_name, :signal_value, :source_event_id,
+                                :confidence, :signal_name, :signal_value, :idempotency_key,
                                 :source_metadata, :created_at, :updated_at)
-                        ON CONFLICT (source_name, source_event_id, signal_name) DO UPDATE SET
+                        ON CONFLICT (source_name, idempotency_key, signal_name) DO UPDATE SET
                             timestamp = EXCLUDED.timestamp,
                             signal_value = EXCLUDED.signal_value,
                             confidence = EXCLUDED.confidence,
@@ -194,7 +172,7 @@ class StreamProcessor:
                         "confidence": confidence,
                         "signal_name": signal_name,
                         "signal_value": signal_value,
-                        "source_event_id": source_event_id,
+                        "idempotency_key": idempotency_key,
                         "source_metadata": json.dumps(metadata),
                         "created_at": datetime.utcnow(),
                         "updated_at": datetime.utcnow()
@@ -219,7 +197,7 @@ class StreamProcessor:
             "sync_metadata": sync_metadata
         }
     
-    def _should_process_event(self, event: Dict[str, Any], signal_config: Dict[str, Any]) -> bool:
+    def _should_process_event(self, event: Dict[str, Any], signal_name: str) -> bool:
         """
         Determine if an event should be processed based on signal configuration.
         """
@@ -245,7 +223,7 @@ class StreamProcessor:
         
         return True
     
-    def _extract_signal_value(self, event: Dict[str, Any], signal_config: Dict[str, Any]) -> str:
+    def _extract_signal_value(self, event: Dict[str, Any], signal_name: str) -> str:
         """
         Extract the signal value from the event.
         """
@@ -340,7 +318,7 @@ class StreamProcessor:
         
         return metadata
     
-    def _calculate_confidence(self, event: Dict[str, Any], signal_config: Dict[str, Any]) -> float:
+    def _calculate_confidence(self, event: Dict[str, Any], signal_name: str) -> float:
         """Calculate confidence score for the signal."""
         
         response_status = event.get('responseStatus', 'accepted')

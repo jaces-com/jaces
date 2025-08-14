@@ -108,7 +108,9 @@ class BaseCategoricalTransitionDetector(ABC):
 
         for transition in transitions:
             # Ensure transition is within time window
-            if start_time <= transition.transition_time <= end_time:
+            # Make transition_time offset-naive if needed for comparison
+            trans_time = transition.transition_time.replace(tzinfo=None) if transition.transition_time.tzinfo else transition.transition_time
+            if start_time <= trans_time <= end_time:
                 # Filter by confidence threshold
                 if transition.confidence >= self.min_confidence:
                     validated.append(transition)

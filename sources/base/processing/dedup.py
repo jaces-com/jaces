@@ -1,7 +1,7 @@
 """
 Generic deduplication utilities for stream to signal processing.
 
-Provides deterministic source_event_id generation based on signal computation type.
+Provides deterministic idempotency key generation based on signal computation type.
 """
 
 import hashlib
@@ -9,9 +9,9 @@ from datetime import datetime
 from typing import Dict, Any
 
 
-def generate_source_event_id(dedup_strategy: str, timestamp: datetime, data: Dict[str, Any]) -> str:
+def generate_idempotency_key(dedup_strategy: str, timestamp: datetime, data: Dict[str, Any]) -> str:
     """
-    Generate deterministic source_event_id based on deduplication strategy.
+    Generate deterministic idempotency key based on deduplication strategy.
     
     Deduplication strategies:
     - 'single': One value per timestamp (time-series data like heart rate, temperature)
@@ -23,7 +23,7 @@ def generate_source_event_id(dedup_strategy: str, timestamp: datetime, data: Dic
         data: Signal data dict containing value and metadata
         
     Returns:
-        Deterministic source_event_id string
+        Deterministic idempotency key string
     """
     
     if dedup_strategy == 'multiple':

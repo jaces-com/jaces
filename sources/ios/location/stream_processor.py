@@ -6,7 +6,7 @@ from uuid import uuid4
 import json
 from pathlib import Path
 from sqlalchemy import text
-from sources.base.processing.dedup import generate_source_event_id
+from sources.base.processing.dedup import generate_idempotency_key
 from sources.base.processing.normalization import DataNormalizer
 
 
@@ -23,8 +23,7 @@ class StreamProcessor:
         Args:
             stream_name: Optional stream name. If not provided, auto-detects from path.
         """
-        # Import registry (at runtime to get latest generated version)
-        from sources._generated_registry import STREAMS, SIGNALS
+        # Note: Registry no longer used - processor relies on passed signal_configs
         
         # Auto-detect stream name if not provided
         if not stream_name:
@@ -32,25 +31,11 @@ class StreamProcessor:
         
         self.stream_name = stream_name
         
-        # Get stream configuration from registry
-        if stream_name not in STREAMS:
-            raise ValueError(f"Stream '{stream_name}' not found in registry")
-        
-        self.stream_config = STREAMS[stream_name]
-        
-        # Extract processor configuration
-        processor_config = self.stream_config.get('processor_config', {})
-        self.source_name = processor_config.get('source_name', self.stream_config.get('source'))
-        self.stream_type = processor_config.get('stream_type', 'array')  # iOS location uses array type
-        self.dedup_strategy = processor_config.get('deduplication_strategy', 'single')
-        
-        # Get signal configurations from registry
-        self.signal_configs = {}
-        signal_names = self.stream_config.get('signals', []) or self.stream_config.get('produces_signals', [])
-        for signal_name in signal_names:
-            if signal_name in SIGNALS:
-                self.signal_configs[signal_name] = SIGNALS[signal_name]
-                print(f"Loaded signal config: {signal_name}")
+        # Configuration will be passed via signal_configs parameter in process()
+        # Set defaults for processor configuration
+        self.source_name = 'ios'  # iOS location is always from iOS source
+        self.stream_type = 'array'  # iOS location uses array type
+        self.dedup_strategy = 'single'
     
     def _detect_stream_name(self) -> str:
         """
@@ -104,6 +89,8 @@ class StreamProcessor:
     ) -> Dict[str, Any]:
         """Process location array data into signals."""
         
+        print(f"[DEBUG iOS Location] Processing stream_data with keys: {stream_data.keys()}")
+        
         # Extract location data array
         locations = stream_data.get('data', [])
         device_id = stream_data.get('device_id')
@@ -112,8 +99,8 @@ class StreamProcessor:
         # Track signals created per signal type
         signals_created = {}
         
-        # Initialize counters for each signal type
-        for signal_name in self.signal_configs.keys():
+        # Initialize counters for each signal type we're actually processing
+        for signal_name in signal_configs.keys():
             signals_created[signal_name] = 0
         
         # Process each location entry
@@ -128,8 +115,8 @@ class StreamProcessor:
             if not timestamp:
                 continue
             
-            # Generate source event ID based on timestamp (for deduplication)
-            source_event_id = generate_source_event_id(
+            # Generate idempotency key based on timestamp (for deduplication)
+            idempotency_key = generate_idempotency_key(
                 self.dedup_strategy,
                 timestamp,
                 {'timestamp': timestamp.isoformat()}
@@ -146,7 +133,7 @@ class StreamProcessor:
             }
             
             # Process coordinates signal
-            if 'ios_coordinates' in signal_configs and 'ios_coordinates' in self.signal_configs:
+            if 'ios_coordinates' in signal_configs:
                 lat = location.get('latitude')
                 lon = location.get('longitude')
                 
@@ -161,12 +148,12 @@ class StreamProcessor:
                             INSERT INTO signals 
                             (id, signal_id, source_name, timestamp, 
                              confidence, signal_name, signal_value, coordinates, 
-                             source_event_id, source_metadata, created_at, updated_at)
+                             idempotency_key, source_metadata, created_at, updated_at)
                             VALUES (:id, :signal_id, :source_name, :timestamp, 
                                     :confidence, :signal_name, :signal_value, 
                                     ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), 
-                                    :source_event_id, :source_metadata, :created_at, :updated_at)
-                            ON CONFLICT (source_name, source_event_id, signal_name) DO UPDATE SET
+                                    :idempotency_key, :source_metadata, :created_at, :updated_at)
+                            ON CONFLICT (source_name, idempotency_key, signal_name) DO UPDATE SET
                                 timestamp = EXCLUDED.timestamp,
                                 signal_value = EXCLUDED.signal_value,
                                 coordinates = EXCLUDED.coordinates,
@@ -184,7 +171,7 @@ class StreamProcessor:
                             "signal_value": f"{lat},{lon}",
                             "lat": lat,
                             "lon": lon,
-                            "source_event_id": source_event_id,
+                            "idempotency_key": idempotency_key,
                             "source_metadata": json.dumps(base_metadata),
                             "created_at": datetime.utcnow(),
                             "updated_at": datetime.utcnow()
@@ -193,7 +180,7 @@ class StreamProcessor:
                     signals_created['ios_coordinates'] += 1
             
             # Process altitude signal
-            if 'ios_altitude' in signal_configs and 'ios_altitude' in self.signal_configs:
+            if 'ios_altitude' in signal_configs:
                 altitude = location.get('altitude')
                 
                 if altitude is not None:
@@ -207,12 +194,12 @@ class StreamProcessor:
                         text("""
                             INSERT INTO signals 
                             (id, signal_id, source_name, timestamp, 
-                             confidence, signal_name, signal_value, source_event_id, 
+                             confidence, signal_name, signal_value, idempotency_key, 
                              source_metadata, created_at, updated_at)
                             VALUES (:id, :signal_id, :source_name, :timestamp, 
-                                    :confidence, :signal_name, :signal_value, :source_event_id, 
+                                    :confidence, :signal_name, :signal_value, :idempotency_key, 
                                     :source_metadata, :created_at, :updated_at)
-                            ON CONFLICT (source_name, source_event_id, signal_name) DO UPDATE SET
+                            ON CONFLICT (source_name, idempotency_key, signal_name) DO UPDATE SET
                                 timestamp = EXCLUDED.timestamp,
                                 signal_value = EXCLUDED.signal_value,
                                 confidence = EXCLUDED.confidence,
@@ -227,7 +214,7 @@ class StreamProcessor:
                             "confidence": confidence,
                             "signal_name": "ios_altitude",
                             "signal_value": str(altitude),
-                            "source_event_id": source_event_id,
+                            "idempotency_key": idempotency_key,
                             "source_metadata": json.dumps(altitude_metadata),
                             "created_at": datetime.utcnow(),
                             "updated_at": datetime.utcnow()
@@ -236,7 +223,7 @@ class StreamProcessor:
                     signals_created['ios_altitude'] += 1
             
             # Process speed signal
-            if 'ios_speed' in signal_configs and 'ios_speed' in self.signal_configs:
+            if 'ios_speed' in signal_configs:
                 speed = location.get('speed', 0)
                 
                 # Only create speed signal if valid (>= 0)
@@ -263,12 +250,12 @@ class StreamProcessor:
                         text("""
                             INSERT INTO signals 
                             (id, signal_id, source_name, timestamp, 
-                             confidence, signal_name, signal_value, source_event_id, 
+                             confidence, signal_name, signal_value, idempotency_key, 
                              source_metadata, created_at, updated_at)
                             VALUES (:id, :signal_id, :source_name, :timestamp, 
-                                    :confidence, :signal_name, :signal_value, :source_event_id, 
+                                    :confidence, :signal_name, :signal_value, :idempotency_key, 
                                     :source_metadata, :created_at, :updated_at)
-                            ON CONFLICT (source_name, source_event_id, signal_name) DO UPDATE SET
+                            ON CONFLICT (source_name, idempotency_key, signal_name) DO UPDATE SET
                                 timestamp = EXCLUDED.timestamp,
                                 signal_value = EXCLUDED.signal_value,
                                 confidence = EXCLUDED.confidence,
@@ -283,7 +270,7 @@ class StreamProcessor:
                             "confidence": confidence,
                             "signal_name": "ios_speed",
                             "signal_value": str(speed),
-                            "source_event_id": source_event_id,
+                            "idempotency_key": idempotency_key,
                             "source_metadata": json.dumps(speed_metadata),
                             "created_at": datetime.utcnow(),
                             "updated_at": datetime.utcnow()

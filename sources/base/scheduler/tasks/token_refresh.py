@@ -19,30 +19,23 @@ logger = logging.getLogger(__name__)
 def create_token_refresher(source_name: str, oauth_credentials: dict, source_config: dict, db):
     """Create a token refresher function for OAuth sources."""
     
-    try:
-        from sources._generated_registry import SOURCES
-    except ImportError:
-        logger.warning("Generated registry not found. Token refresh disabled.")
+    # Check if source_config is None
+    if source_config is None:
+        logger.warning(f"No source config provided for {source_name}, skipping token refresh")
         return None
     
-    # Get source config from registry
-    source = SOURCES.get(source_name)
-    if not source:
-        logger.warning(f"Source '{source_name}' not found in registry")
-        return None
-    
-    logger.info(f"Found source config for {source_name}: auth type = {source.get('auth', {}).get('type')}")
-    
-    # Check if this is an OAuth source
-    if source.get('auth', {}).get('type') != 'oauth2':
+    # Check if this is an OAuth source based on source_config
+    if source_config.get('auth_type') != 'oauth2':
         logger.warning(f"Source {source_name} is not OAuth2, skipping token refresh")
         return None
     
+    logger.info(f"Found source config for {source_name}: auth type = oauth2")
+    
     # Dynamically import the auth module for this source
     try:
-        # Construct auth module path from source path
-        source_path = source['path'].rstrip('/')
-        auth_module_path = f"sources.{source_path.replace('/', '.')}.auth"
+        # Construct auth module path based on naming convention
+        # e.g., google -> sources.google.auth
+        auth_module_path = f"sources.{source_name}.auth"
         logger.info(f"Trying to import auth module: {auth_module_path}")
         
         try:

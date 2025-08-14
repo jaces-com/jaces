@@ -57,7 +57,7 @@ dev: env-check
 	@echo "📝 Pushing database schema..."
 	@docker-compose exec -T web npx drizzle-kit push --force &>/dev/null || true
 	@echo "📊 Checking registry..."
-	@if [ ! -f sources/_generated_registry.yaml ]; then \
+	@if [ ! -f generated_registry.yaml ]; then \
 		echo "   Generating sources registry..."; \
 		(python scripts/generate_registry.py || python3 scripts/generate_registry.py) &>/dev/null || true; \
 	fi
@@ -273,9 +273,9 @@ reset:
 		echo '{"version":"7","dialect":"postgresql","entries":[]}' > apps/web/drizzle/meta/_journal.json; \
 		(cd apps/web && DATABASE_URL="$(DB_URL)" npx drizzle-kit push --force); \
 		echo "📊 Step 6/7: Seeding database..."; \
-		(cd apps/web && DATABASE_URL="$(DB_URL)" pnpm db:seed); \
+		(cd apps/web && DATABASE_URL="$(DB_URL)" MINIO_ENDPOINT="localhost:9000" pnpm db:seed); \
 		echo "📊 Step 7/7: Generating sources registry..."; \
-		$(MAKE) registry; \
+		(python3 scripts/generate_registry.py || python scripts/generate_registry.py || echo "⚠️  Registry generation skipped (python not found)"); \
 		echo "✅ Development environment reset complete!"; \
 		echo "📋 Services status:"; \
 		docker-compose ps; \

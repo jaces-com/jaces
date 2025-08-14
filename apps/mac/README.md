@@ -1,7 +1,6 @@
 # How to Use
 
   1. Build the app:
-  cd /Users/adamjace/Documents/GitHub/jaces/apps/mac
   ./JacesMac/Scripts/build-app.sh
 
   2. Run in GUI mode (default):

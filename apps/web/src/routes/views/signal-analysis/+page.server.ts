@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/db/client';
 import { signals, signalConfigs, sourceConfigs, signalTransitions, events } from '$lib/db/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
-import { parseDate, toZoned, now } from '@internationalized/date';
+import { parseDate, toZoned, now, parseAbsolute } from '@internationalized/date';
 
 export const load: PageServerLoad = async ({ url, depends }) => {
 	// Register dependencies for granular invalidation
@@ -152,7 +152,7 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 			}
 
 			// Parse metadata if it's a string
-			let metadata: any = transition.metadata;
+			let metadata: any = transition.transitionMetadata;
 			if (typeof metadata === 'string') {
 				try {
 					metadata = JSON.parse(metadata);
@@ -161,11 +161,23 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 				}
 			}
 
+			// Map database fields to expected frontend format
+			// Use before/after means as state representation
+			const fromState = transition.beforeMean !== null ? transition.beforeMean.toString() : 'unknown';
+			const toState = transition.afterMean !== null ? transition.afterMean.toString() : 'unknown';
+
 			acc[key].push({
 				id: transition.id,
 				transitionTime: transition.transitionTime.toISOString(),
-				fromState: transition.fromState,
-				toState: transition.toState,
+				fromState: fromState,
+				toState: toState,
+				transitionType: transition.transitionType,
+				changeMagnitude: transition.changeMagnitude,
+				changeDirection: transition.changeDirection,
+				beforeMean: transition.beforeMean,
+				beforeStd: transition.beforeStd,
+				afterMean: transition.afterMean,
+				afterStd: transition.afterStd,
 				confidence: transition.confidence,
 				detectionMethod: transition.detectionMethod,
 				metadata: metadata || {}
@@ -174,20 +186,26 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 			return acc;
 		}, {} as Record<string, any[]>);
 
-		// Query HDBSCAN events for the day
-		const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+		// Query HDBSCAN events that overlap with the selected day in user's timezone
+		// This catches events that may start in the previous UTC day or end in the next UTC day
+		// but are part of the user's experience of this day in their timezone
 		const eventsResults = await db
 			.select()
 			.from(events)
-			.where(eq(events.date, dateString))
+			.where(
+				and(
+					lte(events.startTime, endOfDay),
+					gte(events.endTime, startOfDay)
+				)
+			)
 			.orderBy(events.startTime);
 
 		// Format events for the UI
 		const hdbscanEvents = eventsResults.map(event => ({
 			id: event.id,
 			clusterId: event.clusterId,
-			startTime: event.startTime,
-			endTime: event.endTime,
+			startTime: event.startTime.toISOString(),
+			endTime: event.endTime.toISOString(),
 			coreDensity: event.coreDensity,
 			clusterSize: event.clusterSize,
 			persistence: event.persistence,
@@ -195,9 +213,9 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 			signalContributions: typeof event.signalContributions === 'string'
 				? JSON.parse(event.signalContributions as string)
 				: event.signalContributions,
-			metadata: typeof event.metadata === 'string'
-				? JSON.parse(event.metadata as string)
-				: event.metadata,
+			metadata: typeof event.eventMetadata === 'string'
+				? JSON.parse(event.eventMetadata as string)
+				: event.eventMetadata,
 			eventType: event.eventType || 'activity'
 		}));
 

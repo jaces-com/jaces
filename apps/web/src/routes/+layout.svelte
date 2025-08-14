@@ -34,21 +34,21 @@
 
     // Define modules
     const modules: Record<string, Module> = {
-        home: {
-            id: "home",
-            name: "Home",
-            icon: "ri:message-3-line",
-            iconFilled: "ri:message-3-fill",
-            title: "Home",
-            items: [
-                {
-                    href: "/",
-                    icon: "ri:message-3-line",
-                    text: "New Chat",
-                    pagespace: "",
-                },
-            ],
-        },
+        // home: {
+        //     id: "home",
+        //     name: "Home",
+        //     icon: "ri:message-3-line",
+        //     iconFilled: "ri:message-3-fill",
+        //     title: "Home",
+        //     items: [
+        //         {
+        //             href: "/",
+        //             icon: "ri:message-3-line",
+        //             text: "New Chat",
+        //             pagespace: "",
+        //         },
+        //     ],
+        // },
         views: {
             id: "views",
             name: "Views",
@@ -111,6 +111,34 @@
                     text: "Pipeline",
                     pagespace: "pipeline",
                 },
+            ],
+        },
+        settings: {
+            id: "settings",
+            name: "Settings",
+            icon: "ri:settings-3-line",
+            iconFilled: "ri:settings-3-fill",
+            title: "Settings",
+            items: [
+                {
+                    href: "/settings/database",
+                    icon: "ri:database-line",
+                    text: "Database Access",
+                    pagespace: "database",
+                },
+                // Future settings tabs can be added here:
+                // {
+                //     href: "/settings/api-keys",
+                //     icon: "ri:key-line",
+                //     text: "API Keys",
+                //     pagespace: "api-keys",
+                // },
+                // {
+                //     href: "/settings/general",
+                //     icon: "ri:settings-line",
+                //     text: "General",
+                //     pagespace: "general",
+                // },
             ],
         },
     };

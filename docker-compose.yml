@@ -100,7 +100,7 @@ services:
       - ./apps/web/vite.config.ts:/app/vite.config.ts
       - ./apps/web/tsconfig.json:/app/tsconfig.json
       - ./apps/web/scripts:/app/scripts
-      - ./sources:/app/sources
+      - ./sources:/sources
       - ./tests:/app/tests
 
   # Celery Worker Service
@@ -131,7 +131,7 @@ services:
       AUTH_PROXY_URL: https://auth.jaces.com
     volumes:
       # Mount for hot reload in development
-      - ./sources:/app/sources
+      - ./sources:/sources
       - ./scripts:/app/scripts
       - ./tests:/app/tests
 
@@ -153,7 +153,7 @@ services:
     command: ["uv", "run", "celery", "-A", "sources.base.scheduler.celery_app", "beat", "--loglevel=info"]
     volumes:
       # Mount for hot reload in development
-      - ./sources:/app/sources
+      - ./sources:/sources
       - ./scripts:/app/scripts
       - ./tests:/app/tests
 
@@ -171,6 +171,8 @@ services:
     environment:
       # Database configuration
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+      # Redis configuration
+      REDIS_URL: redis://${REDIS_HOST}:${REDIS_PORT}/0
       # MinIO configuration
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
@@ -180,7 +182,7 @@ services:
       - "${PROCESSING_PORT}:8001"
     volumes:
       # Mount for hot reload in development
-      - ./sources:/app/sources
+      - ./sources:/sources
 
 
 # Named volumes are managed by Docker and persist data outside the container lifecycle.

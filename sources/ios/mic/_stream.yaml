@@ -21,7 +21,7 @@ sync:
 # Signals produced by this stream
 signals:
   - audio_level
-  - mic_transcription  # Not implemented yet
+  - mic_transcription  # Placeholder - transcription not yet implemented
 
 # Processing configuration
 processing:

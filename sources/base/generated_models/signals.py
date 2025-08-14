@@ -20,7 +20,7 @@ class Signals(Base):
     signal_name = Column(String, nullable=False)
     signal_value = Column(String, nullable=False)
     coordinates = Column(JSON)
-    source_event_id = Column(String, nullable=False)
+    idempotency_key = Column(String, nullable=False)
     source_metadata = Column(JSON)
     created_at = Column(DateTime, nullable=False, default=datetime.now)
     updated_at = Column(DateTime, nullable=False, default=datetime.now)

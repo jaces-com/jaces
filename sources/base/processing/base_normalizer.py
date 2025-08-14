@@ -145,7 +145,7 @@ class BaseNormalizer(ABC):
         signal_value: str,
         timestamp: Union[str, datetime],
         confidence: Optional[float] = None,
-        source_event_id: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
@@ -156,7 +156,7 @@ class BaseNormalizer(ABC):
             signal_value: String representation of the value
             timestamp: When the signal occurred
             confidence: Confidence score (will use default if not provided)
-            source_event_id: UUID linking related signals
+            idempotency_key: Key for idempotent processing and deduplication
             metadata: Additional metadata to store
 
         Returns:
@@ -169,7 +169,7 @@ class BaseNormalizer(ABC):
             "confidence": confidence if confidence is not None else self.fidelity_score,
             "signal_name": signal_name,
             "signal_value": signal_value,
-            "source_event_id": source_event_id or self.generate_signal_id(),
+            "idempotency_key": idempotency_key or self.generate_signal_id(),
             "metadata": metadata
         }
 

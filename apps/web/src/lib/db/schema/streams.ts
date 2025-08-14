@@ -28,6 +28,9 @@ export const streams = pgTable('streams', {
   // Custom settings for this stream instance
   settings: json('settings').$type<Record<string, any>>().default({}),
   
+  // Enabled signals for this stream instance
+  enabledSignals: json('enabled_signals').$type<string[]>().default([]),
+  
   // Sync tracking
   lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
   lastSyncStatus: varchar('last_sync_status'), // 'success', 'failed', 'in_progress'

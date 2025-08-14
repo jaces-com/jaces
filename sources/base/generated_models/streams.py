@@ -21,6 +21,7 @@ class Streams(Base):
     initial_sync_days = Column(Integer, default=90)
     initial_sync_days_future = Column(Integer, default=30)
     settings = Column(JSON, default='{}')
+    enabled_signals = Column(JSON, default='[]')
     last_sync_at = Column(DateTime)
     last_sync_status = Column(String)
     last_sync_error = Column(String)

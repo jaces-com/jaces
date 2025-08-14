@@ -145,6 +145,29 @@ def walk_sources_directory() -> Dict[str, Any]:
                                 # Get computation details
                                 computation = signal_config.get('computation', {})
                                 
+                                # Check for detector configuration
+                                detector_class = None
+                                detector_module = None
+                                
+                                # First check if YAML specifies detector class name
+                                if signal_config.get('detector'):
+                                    detector_class = signal_config['detector']
+                                    # If detector.py exists, build the module path
+                                    if (signal_dir / 'detector.py').exists():
+                                        detector_module = f"sources.{source_dir.name}.{stream_dir.name}.{signal_dir.name}.detector"
+                                # Otherwise check if detector.py exists and generate class name
+                                elif (signal_dir / 'detector.py').exists():
+                                    # Generate class name from signal directory name
+                                    detector_class = ''.join(
+                                        word.capitalize() for word in signal_dir.name.split('_'))
+                                    detector_class = f"{detector_class}TransitionDetector"
+                                    detector_module = f"sources.{source_dir.name}.{stream_dir.name}.{signal_dir.name}.detector"
+                                
+                                # Add detector info to computation if found
+                                if detector_class and detector_module:
+                                    computation['detector_class'] = detector_class
+                                    computation['detector_module'] = detector_module
+                                
                                 # Add signal details with full configuration
                                 registry['signals'][signal_name] = {
                                     'source': source_name,
@@ -156,32 +179,19 @@ def walk_sources_directory() -> Dict[str, Any]:
                                     'value_type': computation.get('value_type', 'continuous'),
                                     'algorithm': computation.get('algorithm', 'pelt'),
                                     'cost_function': computation.get('cost_function', 'l2'),
-                                    'computation': computation,  # Include full computation config
+                                    'computation': computation,  # Include full computation config with detector info
                                     'weight': signal_config.get('weight', {}),
                                     'transitions': signal_config.get('transitions', {}),
                                     'zones': signal_config.get('zones', {}),  # Include zones if present
                                     'metadata': signal_config.get('metadata', {}),
                                     'schedule': signal_config.get('schedule', {})
                                 }
-
-                                # Check for detector
-                                if (signal_dir / 'detector.py').exists():
-                                    detector_module = f"sources.{source_dir.name}.{stream_dir.name}.{signal_dir.name}"
-                                    registry['signals'][signal_name]['detector'] = detector_module
-
-                                    # Add to transition detectors (for signal_analysis.py)
-                                    # Check if YAML specifies detector class name, otherwise generate it
-                                    if signal_config.get('detector'):
-                                        class_name = signal_config['detector']
-                                    else:
-                                        # Assumes detector class follows naming convention
-                                        class_name = ''.join(
-                                            word.capitalize() for word in signal_dir.name.split('_'))
-                                        class_name = f"{class_name}TransitionDetector"
-                                    
+                                
+                                # Add to transition_detectors for backward compatibility
+                                if detector_class and detector_module:
                                     registry['transition_detectors'][signal_name] = {
-                                        'module': detector_module,
-                                        'class': class_name
+                                        'module': detector_module.replace('.detector', ''),  # Remove .detector suffix for backward compat
+                                        'class': detector_class
                                     }
 
     return registry
@@ -221,7 +231,7 @@ def validate_registry(registry: Dict[str, Any]) -> List[str]:
     return issues
 
 
-def generate_python_registry(registry: Dict[str, Any]) -> str:
+def generate_python_registry_DEPRECATED(registry: Dict[str, Any]) -> str:
     """Generate Python code for the registry."""
     code = f'''"""
 Auto-generated registry from distributed YAML configurations.
@@ -316,21 +326,20 @@ def main():
     print(
         f"✅ Found {num_sources} sources, {num_streams} streams, {num_signals} signals, {num_semantics} semantics, {num_detectors} detectors")
 
-    # Generate Python registry (for python stuff)
-    python_code = generate_python_registry(registry)
-    python_file = Path(__file__).parent.parent / \
-        'sources' / '_generated_registry.py'
-    with open(python_file, 'w', encoding='utf-8') as f:
-        f.write(python_code)
-    print(f"📝 Generated Python registry: {python_file}")
+    # Generate YAML registry to root directory for documentation
+    yaml_content = """# AUTO-GENERATED DOCUMENTATION - DO NOT EDIT MANUALLY
+# Generated from distributed YAML configurations in sources/
+# For reference only - runtime code uses database as source of truth
+# Run 'make registry' or 'python scripts/generate_registry.py' to regenerate
 
-    # Generate YAML registry (for reference/debugging/seed)
-    yaml_content = generate_yaml_registry(registry)
-    yaml_file = Path(__file__).parent.parent / \
-        'sources' / '_generated_registry.yaml'
+"""
+    yaml_content += generate_yaml_registry(registry)
+    yaml_file = Path(__file__).parent.parent / 'sources' / '_generated_registry.yaml'
     with open(yaml_file, 'w', encoding='utf-8') as f:
         f.write(yaml_content)
-    print(f"📝 Generated YAML registry: {yaml_file}")
+    print(f"📝 Generated documentation registry: {yaml_file}")
+    
+    # Note: Python registry generation removed - use database instead
 
     print("✨ Registry generation complete!")
 

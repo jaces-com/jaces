@@ -1,5 +1,5 @@
 """Apple iOS Mic Transcription Source."""
 
-from .stream_processor import MicAudioStreamProcessor
+from .stream_processor import StreamProcessor
 
-__all__ = ['MicAudioStreamProcessor']
+__all__ = ['StreamProcessor']

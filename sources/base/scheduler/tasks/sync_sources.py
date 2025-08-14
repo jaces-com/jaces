@@ -36,35 +36,36 @@ logger = logging.getLogger(__name__)
 
 
 class SourceRegistry:
-    """Registry for dynamically loading source sync classes - explicit configuration only."""
+    """Registry for dynamically loading source sync classes."""
     
     @staticmethod
-    def get_sync_class(stream_name: str):
-        """Get sync class from registry - explicit configuration required."""
-        try:
-            from sources._generated_registry import STREAMS
-        except ImportError:
-            raise ValueError("Generated registry not found. Run generate_registry.py")
-        
-        stream_config = STREAMS.get(stream_name)
-        if not stream_config:
-            raise ValueError(f"Stream '{stream_name}' not found in registry")
+    def get_sync_class(stream_name: str, source_name: str):
+        """Get sync class based on naming convention."""
         
         # Check if this is a push stream (no sync needed)
-        if stream_config.get('ingestion', {}).get('type') == 'push' and 'sync_module' not in stream_config:
+        # Push streams like ios_mic don't have sync classes
+        push_streams = ['ios_mic', 'ios_location', 'ios_healthkit', 'mac_apps']
+        if stream_name in push_streams:
             raise ValueError(f"Stream '{stream_name}' is push-only (no sync needed)")
         
-        # Must have explicit sync_module and sync_class
-        sync_module = stream_config.get('sync_module')
-        sync_class = stream_config.get('sync_class')
+        # Derive sync module and class based on naming convention
+        # e.g., google_calendar -> sources.google.calendar.sync.GoogleCalendarSync
+        stream_parts = stream_name.split('_', 1)
+        if len(stream_parts) == 2 and stream_parts[0] == source_name:
+            # Remove source prefix from stream name for path
+            stream_subdir = stream_parts[1]
+        else:
+            # Use full stream name if no source prefix
+            stream_subdir = stream_name
         
-        if not sync_module:
-            raise ValueError(f"Stream '{stream_name}' missing 'sync_module' in registry")
+        # Build module path
+        sync_module = f"sources.{source_name}.{stream_subdir}.sync"
         
-        if not sync_class:
-            raise ValueError(f"Stream '{stream_name}' missing 'sync_class' in registry")
+        # Derive sync class name from stream name
+        # e.g., google_calendar -> GoogleCalendarSync
+        sync_class = ''.join(p.capitalize() for p in stream_name.split('_')) + 'Sync'
         
-        # Import and return the explicit class
+        # Import and return the class
         try:
             module = importlib.import_module(sync_module)
             return getattr(module, sync_class)
@@ -114,7 +115,7 @@ def sync_stream(self, stream_id: str, manual: bool = False):
 
         # Get the sync class for this stream (not source)
         try:
-            sync_class = SourceRegistry.get_sync_class(stream_name)
+            sync_class = SourceRegistry.get_sync_class(stream_name, source_name)
         except ValueError as e:
             # Source doesn't have a sync implementation (might be webhook-only)
             return {"status": "skipped", "reason": str(e)}

@@ -36,7 +36,7 @@ class PipelineActivities(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, nullable=False)
     activity_type = Column(PGEnum(ActivityTypeStatus, name='activity_type'), nullable=False)
     activity_name = Column(String, nullable=False)
-    stream_id = Column(UUID(as_uuid=True), ForeignKey('streamConfigs.id', ondelete='SET NULL'), index=True)
+    stream_id = Column(UUID(as_uuid=True), ForeignKey('streams.id', ondelete='SET NULL'), index=True)
     signal_id = Column(UUID(as_uuid=True), ForeignKey('signalConfigs.id', ondelete='SET NULL'), index=True)
     source_name = Column(String, nullable=False)
     status = Column(PGEnum(ActivityStatus, name='activity_status'), nullable=False, default=ActivityStatus.PENDING)

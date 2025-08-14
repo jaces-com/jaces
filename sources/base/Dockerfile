@@ -5,6 +5,8 @@ WORKDIR /app
 # Install system dependencies (for both services)
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
+    python3-dev \
     libavcodec-dev \
     libavformat-dev \
     libavutil-dev \
@@ -20,7 +22,7 @@ COPY sources/base/uv.lock* sources/base/
 
 # Install dependencies with uv
 WORKDIR /app/sources/base
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 # Return to app root
 WORKDIR /app

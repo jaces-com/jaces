@@ -1,0 +1,45 @@
+# iOS Microphone Transcription Signal Configuration
+# Voice transcription from audio chunks
+
+name: ios_mic_transcription
+source: ios
+stream: ios_mic
+display_name: Voice Transcription
+description: Transcribed text from microphone audio chunks
+
+# Signal characteristics
+unit:
+  ucum: "{text}"
+  display: "text"
+
+# Processing configuration
+processing:
+  type: text
+  confidence_threshold: 0.7
+  deduplication: multiple  # Allow multiple transcriptions at same timestamp
+  
+# Analysis configuration
+analysis:
+  transitions:
+    enabled: false  # Text transitions not yet implemented
+  aggregation:
+    enabled: false
+  
+# Semantic mapping
+semantics:
+  category: communication
+  subcategory: voice
+  importance: high
+  privacy_level: high
+  
+# TODO: Implementation pending
+# This signal is defined but not yet processed
+# Requires integration with transcription service (Whisper/etc)
+implementation_status: placeholder
+notes: |
+  This signal is defined for future implementation.
+  The stream processor creates placeholder records.
+  Actual transcription requires:
+  1. Audio processing service setup
+  2. Whisper or similar ASR integration
+  3. Background task for async processing

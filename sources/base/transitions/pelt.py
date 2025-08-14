@@ -99,9 +99,11 @@ class BasePELTTransitionDetector(BaseCategoricalTransitionDetector):
                 transitions.extend(pelt_transitions)
             
             # Add collection stopped transition
+            # Ensure period_end is offset-naive for comparison
+            period_end_naive = period_end.replace(tzinfo=None) if period_end.tzinfo else period_end
             should_add_stop = (
                 i < len(collection_periods) - 1 or 
-                (end_time - period_end).total_seconds() > self.gap_threshold_seconds
+                (end_time - period_end_naive).total_seconds() > self.gap_threshold_seconds
             )
             
             if should_add_stop:
