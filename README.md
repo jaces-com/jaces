@@ -12,9 +12,7 @@
 
 Jaces is your personal AI agent that ingests your digital life—from calendar events and locations to health metrics and screen time—constructing a coherent, queryable timeline. Unlike cloud services that monetize your data, Jaces runs on your infrastructure, ensuring complete privacy and control.
 
-<video src=".github/videos/example.webm" width="100%" controls autoplay loop muted>
-  View the demo video
-</video>
+https://github.com/user-attachments/assets/7d3b0c3b-f20b-4b74-b250-c5ff4c3d8d3d
 
 Your data is incredibly valuable—companies build trillion-dollar empires on it. Jaces lets you reclaim that value for yourself:
 
