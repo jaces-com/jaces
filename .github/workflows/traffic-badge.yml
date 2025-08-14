@@ -5,6 +5,7 @@ on:
       - main
   schedule:
     - cron: '1 0 * * *' # Runs daily at 00:01 UTC
+  workflow_dispatch: # Allow manual trigger
 
 jobs:
   run:
@@ -47,7 +48,7 @@ jobs:
           logo: github
 
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@v3.9.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: ${{ steps.traffic.outputs.traffic_branch }}
@@ -55,6 +56,8 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           full_commit_message: ${{ steps.message.outputs.result }}
+          keep_files: false
+          force_orphan: true # This helps with first-time branch creation
 
       - name: Show Traffic Data
         run: |
