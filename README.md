@@ -1,10 +1,6 @@
-# Jaces
+# Jaces: An open source ecosystem for owning and exporting your personal data
 
-[![GitHub Views](https://raw.githubusercontent.com/jaces-com/jaces/traffic/traffic-jaces-com/jaces/views.svg)](https://github.com/jaces-com/jaces)
-[![GitHub Views per Week](https://raw.githubusercontent.com/jaces-com/jaces/traffic/traffic-jaces-com/jaces/views_per_week.svg)](https://github.com/jaces-com/jaces)
-[![GitHub Clones](https://raw.githubusercontent.com/jaces-com/jaces/traffic/traffic-jaces-com/jaces/clones.svg)](https://github.com/jaces-com/jaces)
-[![GitHub Clones per Week](https://raw.githubusercontent.com/jaces-com/jaces/traffic/traffic-jaces-com/jaces/clones_per_week.svg)](https://github.com/jaces-com/jaces)
-[![GitHub Stars](https://img.shields.io/github/stars/jaces-com/jaces?style=social)](https://github.com/jaces-com/jaces/stargazers)
+![GitHub Clones](https://raw.githubusercontent.com/jaces-com/jaces/traffic/traffic-jaces/clones.svg)
 [![Release](https://img.shields.io/badge/Release-None-red.svg)](https://github.com/jaces-com/jaces/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: ELv2](https://img.shields.io/badge/License-ELv2-orange.svg)](https://www.elastic.co/licensing/elastic-license)
