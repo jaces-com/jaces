@@ -10,7 +10,9 @@ console.log('Environment variables check:', {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'LOADED' : 'NOT_LOADED',
   GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || 'NOT_SET',
   NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID ? 'LOADED' : 'NOT_LOADED',
-  NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET ? 'LOADED' : 'NOT_LOADED'
+  NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET ? 'LOADED' : 'NOT_LOADED',
+  STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID ? 'LOADED' : 'NOT_LOADED',
+  STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET ? 'LOADED' : 'NOT_LOADED'
 });
 
 export interface OAuthConfig {
@@ -65,6 +67,15 @@ export const oauthConfigs = {
     scopes: ['repo', 'user:email'],
     authUrl: 'https://github.com/login/oauth/authorize',
     tokenUrl: 'https://github.com/login/oauth/access_token'
+  },
+  
+  strava: {
+    clientId: process.env.STRAVA_CLIENT_ID || '',
+    clientSecret: process.env.STRAVA_CLIENT_SECRET || '',
+    redirectUri: process.env.STRAVA_REDIRECT_URI || 'https://auth.jaces.com/strava/callback',
+    scopes: ['read,activity:read_all'], // Strava uses comma-separated scopes
+    authUrl: 'https://www.strava.com/oauth/authorize',
+    tokenUrl: 'https://www.strava.com/oauth/token'
   }
 } as const;
 

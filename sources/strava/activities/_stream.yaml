@@ -1,0 +1,39 @@
+# Strava Activities Stream Configuration
+# Fitness activities and workouts from Strava API v3
+
+name: strava_activities
+source: strava
+display_name: Activities
+description: Running, cycling, and other fitness activities
+
+# Stream processing settings
+ingestion:
+  type: pull # We fetch from Strava API
+  batch_type: activities
+  raw_data_type: StravaActivity
+
+# API configuration
+api:
+  endpoint: https://www.strava.com/api/v3
+  rate_limit: 100 # requests per 15 minutes
+  pagination: true
+  max_results: 30 # Strava recommends 30 per page
+
+# Sync configuration
+sync:
+  schedule: "*/30 * * * *" # Every 30 minutes
+  type: incremental # Uses after/before timestamps for incremental sync
+
+# Processing configuration
+processing:
+  normalization: true
+  
+# Stream processor configuration
+processor:
+  class_name: StreamProcessor
+  source_name: strava
+  stream_type: activities
+  # Signals are auto-discovered from subdirectories with _signal.yaml files
+  deduplication_strategy: single  # Activities have unique IDs
+  event_id_fields:  # Fields to use for deduplication
+    - activity_id

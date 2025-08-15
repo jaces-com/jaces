@@ -4,7 +4,7 @@
 # Run 'make registry' or 'python scripts/generate_registry.py' to regenerate
 
 version: 2.0.0
-generated_at: '2025-08-14T11:06:25.367575'
+generated_at: '2025-08-15T10:35:07.066438'
 sources:
   google:
     path: google/
@@ -35,6 +35,32 @@ sources:
       required_scopes:
       - https://www.googleapis.com/auth/calendar.readonly
       - https://www.googleapis.com/auth/calendar.events.readonly
+  strava:
+    path: strava/
+    display_name: Strava
+    description: Fitness activities, workouts, and performance metrics from Strava
+    company: strava
+    platform: cloud
+    icon: simple-icons:strava
+    video: strava.webm
+    auth:
+      type: oauth2
+      provider: strava
+      auth_url: https://www.strava.com/oauth/authorize
+      token_url: https://www.strava.com/oauth/token
+      revoke_url: https://www.strava.com/oauth/deauthorize
+      auth_proxy: https://auth.jaces.com/strava/auth
+      token_refresh_window: 300
+    sync:
+      type: pull
+      page_size: 30
+    requirements: {}
+    streams:
+    - strava_activities
+    streams_config:
+    - name: activities
+      display_name: Activities
+      description: Running, cycling, and other fitness activities
   ios:
     path: ios/
     display_name: iPhone
@@ -178,6 +204,35 @@ streams:
     semantics: []
     sync_module: sources.google.calendar.sync
     sync_class: GoogleCalendarSync
+  strava_activities:
+    source: strava
+    path: strava/activities/
+    display_name: Activities
+    description: Running, cycling, and other fitness activities
+    processor: sources.strava.activities.stream_processor
+    processor_config:
+      class_name: StreamProcessor
+      source_name: strava
+      stream_type: activities
+      deduplication_strategy: single
+      event_id_fields:
+      - activity_id
+    output_type: signals
+    ingestion:
+      type: pull
+      batch_type: activities
+      raw_data_type: StravaActivity
+    sync:
+      schedule: '*/30 * * * *'
+      type: incremental
+    processing:
+      normalization: true
+    storage: {}
+    signals:
+    - strava_activities
+    semantics: []
+    sync_module: sources.strava.activities.sync
+    sync_class: StravaActivitiesSync
   ios_healthkit:
     source: ios
     path: ios/healthkit/
@@ -426,6 +481,77 @@ signals:
       - reminder
     schedule:
       cron: '*/15 * * * *'
+      priority: medium
+  strava_activities:
+    source: strava
+    stream: strava_activities
+    path: strava/activities/activities/
+    display_name: Fitness Activities
+    description: Running, cycling, and other fitness activities from Strava
+    unit:
+      ucum: 1
+      display: activity
+    value_type: event
+    algorithm: event_detection
+    cost_function: l2
+    computation:
+      algorithm: event_detection
+      analysis_type: categorical
+      value_type: event
+      detector_class: StravaActivitiesTransitionDetector
+      detector_module: sources.strava.activities.activities.detector
+    weight:
+      macro: 0.8
+      micro: 0.75
+    transitions:
+      min_gap_seconds: 900
+      confidence_threshold: 0.9
+    zones: {}
+    metadata:
+      activity_types:
+      - Run
+      - Ride
+      - Swim
+      - Walk
+      - Hike
+      - VirtualRide
+      - AlpineSki
+      - BackcountrySki
+      - Canoeing
+      - Crossfit
+      - EBikeRide
+      - Elliptical
+      - Golf
+      - Handcycle
+      - IceSkate
+      - InlineSkate
+      - Kayaking
+      - Kitesurf
+      - NordicSki
+      - RockClimbing
+      - RollerSki
+      - Rowing
+      - Run
+      - Sail
+      - Skateboard
+      - Snowboard
+      - Snowshoe
+      - Soccer
+      - StairStepper
+      - StandUpPaddling
+      - Surfing
+      - Swim
+      - Velomobile
+      - VirtualRide
+      - VirtualRun
+      - Walk
+      - WeightTraining
+      - Wheelchair
+      - Windsurf
+      - Workout
+      - Yoga
+    schedule:
+      cron: '*/30 * * * *'
       priority: medium
   ios_active_energy:
     source: ios
@@ -894,6 +1020,9 @@ transition_detectors:
   google_calendar_events:
     module: sources.google.calendar.events
     class: CalendarEventsTransitionDetector
+  strava_activities:
+    module: sources.strava.activities.activities
+    class: StravaActivitiesTransitionDetector
   ios_active_energy:
     module: sources.ios.healthkit.active_energy
     class: ActiveEnergyTransitionDetector

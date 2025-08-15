@@ -1,0 +1,82 @@
+# Strava Activities Signal Configuration
+# Fitness activities and workouts
+
+name: strava_activities
+source: strava
+stream: strava_activities
+display_name: Fitness Activities
+description: Running, cycling, and other fitness activities from Strava
+
+# Units and measurement
+unit:
+  ucum: 1 # Dimensionless unit for discrete events
+  display: activity
+
+# Transition detection algorithm
+computation:
+  algorithm: event_detection
+  analysis_type: categorical # Activities are discrete events
+  value_type: event # Display as event blocks in visualization
+  
+# Processing schedule
+schedule:
+  cron: "*/30 * * * *"  # Every 30 minutes
+  priority: medium
+
+# Signal importance
+weight:
+  macro: 0.8  # High importance for fitness tracking
+  micro: 0.75
+
+# Transition settings
+transitions:
+  min_gap_seconds: 900 # 15 minutes between distinct activities
+  confidence_threshold: 0.9
+
+# Transition detector class
+detector: StravaActivitiesTransitionDetector
+
+# Metadata
+metadata:
+  activity_types:
+    - Run
+    - Ride
+    - Swim
+    - Walk
+    - Hike
+    - VirtualRide
+    - AlpineSki
+    - BackcountrySki
+    - Canoeing
+    - Crossfit
+    - EBikeRide
+    - Elliptical
+    - Golf
+    - Handcycle
+    - IceSkate
+    - InlineSkate
+    - Kayaking
+    - Kitesurf
+    - NordicSki
+    - RockClimbing
+    - RollerSki
+    - Rowing
+    - Run
+    - Sail
+    - Skateboard
+    - Snowboard
+    - Snowshoe
+    - Soccer
+    - StairStepper
+    - StandUpPaddling
+    - Surfing
+    - Swim
+    - Velomobile
+    - VirtualRide
+    - VirtualRun
+    - Walk
+    - WeightTraining
+    - Wheelchair
+    - Windsurf
+    - Workout
+    - Yoga

@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 
 import { googleRouter } from './routes/google';
 import notionRouter from './routes/notion';
+import { stravaRouter } from './routes/strava';
 import { errorHandler } from './middleware/error-handler';
 import { logger } from './middleware/logger';
 
@@ -41,6 +42,7 @@ app.get('/health', (req, res) => {
 // OAuth routes
 app.use('/google', googleRouter);
 app.use('/notion', notionRouter);
+app.use('/strava', stravaRouter);
 
 // Error handling
 app.use(errorHandler);
@@ -53,7 +55,7 @@ app.use('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 OAuth proxy server running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📦 Providers: Google, Notion, Microsoft, GitHub`);
+  console.log(`📦 Providers: Google, Notion, Microsoft, GitHub, Strava`);
 });
 
 export default app;

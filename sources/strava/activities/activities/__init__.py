@@ -1,0 +1,1 @@
+"""Strava Activities signal module."""
