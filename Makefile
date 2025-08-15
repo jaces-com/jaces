@@ -112,7 +112,7 @@ db-migrate:
 # Seed database with test data
 db-seed:
 	@echo "🌱 Seeding database with TypeScript seeds..."
-	(cd apps/web && DATABASE_URL="$(DB_URL)" MINIO_ENDPOINT="localhost:9000" pnpm db:seed)
+	docker-compose exec -T -e DATABASE_URL="$(DB_URL_DOCKER)" -e MINIO_ENDPOINT="minio:9000" web pnpm db:seed
 
 # Quick database reset - drop and recreate database
 db-reset:
@@ -130,15 +130,15 @@ db-reset:
 		echo "🔧 Installing database extensions..."; \
 		docker-compose exec -T postgres psql -U $(DB_USER) -d $(DB_NAME) < scripts/init-db.sql; \
 		echo "📝 Pushing schema to fresh database..."; \
-		(cd apps/web && DATABASE_URL="$(DB_URL)" npx drizzle-kit push --force); \
+		docker-compose exec -T -e DATABASE_URL="$(DB_URL_DOCKER)" web npx drizzle-kit push --force; \
 		echo "🪣 Clearing MinIO bucket..."; \
 		docker-compose exec -T minio mc alias set local http://localhost:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin} &>/dev/null || true; \
 		docker-compose exec -T minio mc rm --recursive --force local/jaces &>/dev/null 2>&1 || true; \
 		docker-compose exec -T minio mc mb local/jaces --ignore-existing &>/dev/null || true; \
 		echo "🌱 Seeding database and MinIO..."; \
-		(cd apps/web && DATABASE_URL="$(DB_URL)" MINIO_ENDPOINT="localhost:9000" pnpm db:seed); \
+		docker-compose exec -T -e DATABASE_URL="$(DB_URL_DOCKER)" -e MINIO_ENDPOINT="minio:9000" web pnpm db:seed; \
 		echo "🐍 Generating Python models..."; \
-		(cd apps/web && pnpm run db:python || echo "⚠️  Python model generation skipped (python not found)"); \
+		docker-compose exec -T web pnpm run db:python || echo "⚠️  Python model generation skipped"; \
 		echo "✅ Database reset complete with test data!"; \
 	else \
 		echo "❌ Reset cancelled."; \
@@ -147,7 +147,7 @@ db-reset:
 # Generate Python models from Drizzle schemas
 db-python:
 	@echo "🐍 Generating Python models from Drizzle schemas..."
-	(cd apps/web && pnpm db:python)
+	docker-compose exec -T web pnpm db:python
 
 # Start Drizzle Studio database UI
 db-studio:
@@ -269,11 +269,10 @@ reset:
 		done; \
 		echo "🗑️  Step 5/8: Resetting drizzle migration state and pushing schema..."; \
 		sleep 2; \
-		rm -rf apps/web/drizzle/meta/*; \
-		echo '{"version":"7","dialect":"postgresql","entries":[]}' > apps/web/drizzle/meta/_journal.json; \
-		(cd apps/web && DATABASE_URL="$(DB_URL)" npx drizzle-kit push --force); \
+		docker-compose exec -T web sh -c "rm -rf drizzle/meta/* && echo '{\"version\":\"7\",\"dialect\":\"postgresql\",\"entries\":[]}' > drizzle/meta/_journal.json"; \
+		docker-compose exec -T -e DATABASE_URL="$(DB_URL_DOCKER)" web npx drizzle-kit push --force; \
 		echo "📊 Step 6/7: Seeding database..."; \
-		(cd apps/web && DATABASE_URL="$(DB_URL)" MINIO_ENDPOINT="localhost:9000" pnpm db:seed); \
+		docker-compose exec -T -e DATABASE_URL="$(DB_URL_DOCKER)" -e MINIO_ENDPOINT="minio:9000" web pnpm db:seed; \
 		echo "📊 Step 7/7: Generating sources registry..."; \
 		(python3 scripts/generate_registry.py || python scripts/generate_registry.py || echo "⚠️  Registry generation skipped (python not found)"); \
 		echo "✅ Development environment reset complete!"; \

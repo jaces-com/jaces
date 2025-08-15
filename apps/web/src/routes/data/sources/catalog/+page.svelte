@@ -88,11 +88,11 @@
 						Browse and connect available data sources
 					</p>
 				</div>
-				<Button
+				<!-- <Button
 					href="/data/sources"
 					text="← Back to Sources"
 					variant="outline"
-				/>
+				/> -->
 			</div>
 		</div>
 
@@ -104,7 +104,7 @@
 
 		<!-- All Sources Grid -->
 		{#if data.sources && data.sources.length > 0}
-			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
 				{#each data.sources as source}
 					{@const videoSrc = source.video
 						? getVideoSrc(source.video)
