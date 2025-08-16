@@ -1,0 +1,62 @@
+[
+  {
+    "path": "/jaces-com/jaces",
+    "title": "jaces-com/jaces: Open source personal data ecosystem.",
+    "count": 5,
+    "uniques": 5
+  },
+  {
+    "path": "/jaces-com/jaces/blob/main/apps/web/scripts/drizzle-to-python.ts",
+    "title": "jaces/apps/web/scripts/drizzle-to-python.ts at main · jaces-com/jaces · GitHub",
+    "count": 5,
+    "uniques": 5
+  },
+  {
+    "path": "/jaces-com/jaces/tree/main",
+    "title": "jaces-com/jaces: Open source personal data ecosystem.",
+    "count": 4,
+    "uniques": 4
+  },
+  {
+    "path": "/jaces-com/jaces/tree/main/apps",
+    "title": "jaces/apps at main · jaces-com/jaces · GitHub",
+    "count": 2,
+    "uniques": 2
+  },
+  {
+    "path": "/jaces-com/jaces/blob/main/README.md",
+    "title": "jaces/README.md at main · jaces-com/jaces · GitHub",
+    "count": 1,
+    "uniques": 1
+  },
+  {
+    "path": "/jaces-com/jaces/blob/main/scripts/generate_registry.py",
+    "title": "jaces/scripts/generate_registry.py at main · jaces-com/jaces · GitHub",
+    "count": 1,
+    "uniques": 1
+  },
+  {
+    "path": "/jaces-com/jaces/blob/main/.vscode/settings.json",
+    "title": "jaces/.vscode/settings.json at main · jaces-com/jaces · GitHub",
+    "count": 1,
+    "uniques": 1
+  },
+  {
+    "path": "/jaces-com/jaces/stargazers",
+    "title": "Stargazers · jaces-com/jaces",
+    "count": 1,
+    "uniques": 1
+  },
+  {
+    "path": "/jaces-com/jaces/tree/main/apps/ios",
+    "title": "jaces/apps/ios at main · jaces-com/jaces · GitHub",
+    "count": 1,
+    "uniques": 1
+  },
+  {
+    "path": "/jaces-com/jaces/tree/main/apps/mac",
+    "title": "jaces/apps/mac at main · jaces-com/jaces · GitHub",
+    "count": 1,
+    "uniques": 1
+  }
+]
